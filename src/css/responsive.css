@@ -1,0 +1,141 @@
+/* 移动端响应式样式 - 仅用于组件适配 */
+
+/* 平台头部响应式 */
+@media screen and (max-width: 768px) {
+  .platform-header {
+    padding: 0 15px;
+  }
+  
+  .header-logo span {
+    font-size: 16px;
+  }
+  
+  .user-info span {
+    display: none;
+  }
+}
+
+
+/* 侧边栏响应式 */
+@media screen and (max-width: 768px) {
+  /* .sidebar {
+    display: none;
+  } */
+  
+  .platform-container {
+    margin-left: 0 !important;
+  }
+  
+  .platform-body {
+    padding: 0;
+  }
+  
+  .main-content {
+    height: calc(100vh - 100px);
+    border-radius: 0;
+  }
+}
+
+/* 主布局响应式 */
+@media screen and (max-width: 768px) {
+  .platform-body {
+    padding: 10px;
+    gap: 10px;
+  }
+  
+  .main-content {
+    height: calc(100vh - 160px);
+  }
+}
+
+@media screen and (min-width: 769px) and (max-width: 1024px) {
+  .main-content {
+    height: calc(100vh - 120px);
+  }
+}
+
+/* 工具栏响应式 */
+@media screen and (max-width: 768px) {
+  .toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .toolbar .el-input,
+  .toolbar .el-select {
+    width: 100% !important;
+    margin-left: 0 !important;
+  }
+  
+  .toolbar .el-button {
+    width: 100%;
+  }
+}
+
+/* 管理工具栏响应式 */
+@media screen and (max-width: 768px) {
+  .management-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .management-bar .el-button {
+    width: 100%;
+  }
+}
+
+/* 分页器响应式 */
+@media screen and (max-width: 768px) {
+  .el-pagination {
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  
+  .el-pagination .el-pagination__total,
+  .el-pagination .el-pagination__sizes,
+  .el-pagination .el-pager .btn-prev,
+  .el-pagination .el-pager .btn-next,
+  .el-pagination .el-pager .number {
+    margin: 5px 0;
+  }
+}
+
+/* 表格响应式 */
+@media screen and (max-width: 768px) {
+  .el-table {
+    font-size: 12px;
+  }
+  
+  .el-table .el-table__header th {
+    font-size: 11px;
+    padding: 8px 0;
+  }
+  
+  .el-table .el-table__body td {
+    padding: 8px 0;
+  }
+}
+
+/* 对话框响应式 */
+@media screen and (max-width: 768px) {
+  .el-dialog {
+    width: 90% !important;
+  }
+  
+  .el-dialog__body {
+    padding: 15px;
+  }
+}
+
+/* 表单响应式 */
+@media screen and (max-width: 768px) {
+  .el-form-item__label {
+    font-size: 13px !important;
+    padding-right: 8px !important;
+  }
+  
+  .el-form-item {
+    margin-bottom: 15px;
+  }
+}
