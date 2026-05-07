@@ -3,8 +3,16 @@
 </template>
 
 <script>
+import { websocketClient } from '@/utils/websocket'
+
 export default {
-  name: 'App'
+  name: 'App',
+  mounted() {
+    const userId = localStorage.getItem('userId')
+    if (userId) {
+      websocketClient.connect(userId)
+    }
+  }
 }
 </script>
 
@@ -23,5 +31,4 @@ body {
 }
 
 @import url('@/css/responsive.css');
-
 </style>

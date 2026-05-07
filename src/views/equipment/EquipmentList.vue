@@ -33,7 +33,7 @@
           </template>
         </el-input>
         <el-button
-          v-if="!showManagement"
+          v-if="isAdmin && !showManagement"
           type="primary"
           @click="showManagement = true"
           style="margin-left: auto;"
@@ -64,27 +64,19 @@
         ref="tableRef"
         @selection-change="handleSelectionChange"
       >
-        <el-table-column v-if="showManagement" type="selection" width="55" align="center" />
+        <el-table-column v-if="showManagement && isAdmin" type="selection" width="55" align="center" />
         <el-table-column type="index" label="序号" width="60" align="center" :index="getIndex" />
-        <el-table-column prop="equipmentNumber" label="设备编号" width="120" />
-        <el-table-column prop="equipmentName" label="设备名称" width="150" />
+        <el-table-column prop="equipmentNumber" label="设备编号" width="140" />
+        <el-table-column prop="equipmentName" label="设备名称" width="140" />
+        <el-table-column prop="equipmentModel" label="设备型号" width="140" />
         <el-table-column prop="description" label="设备描述" width="200" />
-         <el-table-column prop="equipmentImage" label="设备图片" width="100">
+        <el-table-column label="设备图片" width="100" align="center">
           <template #default="{ row }">
-            <el-avatar
-              v-if="row.equipmentImage && row.equipmentImage !== '' && row.equipmentImage !== '未设置'"
-              :src="row.equipmentImage"
-              size="large"
-              shape="square"
-              class="equipment-avatar"
-              @error="handleImageError(row)"
-            />
-            <el-avatar
-              v-else
-              size="large"
-              shape="square"
-              :src="defaultImage"
-              class="equipment-avatar"
+            <el-image
+              :src="row.equipmentImage || defaultImage"
+              fit="cover"
+              style="width: 60px; height: 60px; border-radius: 4px"
+              :preview-src-list="row.equipmentImage ? [row.equipmentImage] : []"
             />
           </template>
         </el-table-column>
@@ -102,10 +94,10 @@
         <el-table-column prop="equipmentStatus" label="设备状态" width="120">
           <template #default="{ row }">
             <el-tag 
-              :type="getStatusType(row.equipmentStatus)"
+              :type="getStatusType(row.equipmentStatus, row.stockQuantity, row.availableQuantity, row.borrowQuantity, row.reserveQuantity)"
               disable-transitions
             >
-              {{ getStatusText(row.equipmentStatus) }}
+              {{ getStatusText(row.equipmentStatus, row.stockQuantity, row.availableQuantity, row.borrowQuantity, row.reserveQuantity) }}
             </el-tag>
           </template>
         </el-table-column>
@@ -117,6 +109,13 @@
         </el-table-column>
         <el-table-column prop="availableQuantity" label="可用数量" width="100" />
         <el-table-column prop="stockQuantity" label="库存数量" width="100" />
+        <el-table-column label="故障数量" width="100">
+          <template #default="{ row }">
+            <el-tag :type="row.unavailableQuantity > 0 ? 'danger' : 'info'" disable-transitions>
+              {{ row.unavailableQuantity || 0 }} 台
+            </el-tag>
+          </template>
+        </el-table-column>
         <el-table-column label="二维码" width="100">
           <template #default="{ row }">
             <el-button type="primary" link @click="viewQRCode(row.id)">查看</el-button>
@@ -129,16 +128,16 @@
               v-if="row.availableQuantity > 0" 
               type="success" 
               link 
-              @click="handleBorrow(row)"
-            >借用</el-button>
+              @click="handleReserve(row)"
+            >预约</el-button>
             <el-button 
               v-else 
               type="success" 
               link 
               disabled
-            >借用</el-button>
-            <el-button type="warning" link @click="handleRepair(row)">报修</el-button>
+            >预约</el-button>
             <template v-if="isAdmin">
+              <el-button type="warning" link @click="handleRepair(row)">报修</el-button>
               <el-button type="info" link @click="handleEdit(row)">编辑</el-button>
               <el-button type="danger" link @click="handleDelete(row)">删除</el-button>
             </template>
@@ -167,6 +166,7 @@
         <el-descriptions :column="2" border>
           <el-descriptions-item label="设备编号">{{ viewForm.equipmentNumber || '-' }}</el-descriptions-item>
           <el-descriptions-item label="设备名称">{{ viewForm.equipmentName || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="设备型号">{{ viewForm.equipmentModel || '-' }}</el-descriptions-item>
           <el-descriptions-item label="设备类型">
             <el-tag 
               :type="getEquipmentTypeColor(viewForm.equipmentTypeId)"
@@ -178,14 +178,24 @@
           </el-descriptions-item>
           <el-descriptions-item label="设备状态">
             <el-tag 
-              :type="getStatusType(viewForm.equipmentStatus)"
+              :type="getStatusType(viewForm.equipmentStatus, viewForm.stockQuantity, viewForm.availableQuantity, viewForm.borrowQuantity, viewForm.reserveQuantity)"
               disable-transitions
             >
-              {{ getStatusText(viewForm.equipmentStatus) }}
+              {{ getStatusText(viewForm.equipmentStatus, viewForm.stockQuantity, viewForm.availableQuantity, viewForm.borrowQuantity, viewForm.reserveQuantity) }}
             </el-tag>
           </el-descriptions-item>
           <el-descriptions-item label="设备位置">{{ viewForm.equipmentLocation || '-' }}</el-descriptions-item>
           <el-descriptions-item label="库存数量">{{ viewForm.stockQuantity || 0 }}</el-descriptions-item>
+          <el-descriptions-item label="可用数量">
+            <el-tag :type="viewForm.availableQuantity > 0 ? 'success' : 'danger'">
+              {{ viewForm.availableQuantity || 0 }} 台
+            </el-tag>
+          </el-descriptions-item>
+          <el-descriptions-item label="故障数量">
+            <el-tag :type="viewForm.unavailableQuantity > 0 ? 'danger' : 'info'">
+              {{ viewForm.unavailableQuantity || 0 }} 台
+            </el-tag>
+          </el-descriptions-item>
           <el-descriptions-item label="供应商">{{ viewForm.supplier || '未设置' }}</el-descriptions-item>
         <el-descriptions-item label="设备图片">
           <div class="avatar-section">
@@ -234,25 +244,34 @@
           <el-input v-model="editForm.equipmentNumber" disabled />
         </el-form-item>
         <el-form-item label="设备名称" prop="equipmentName">
-          <el-input v-model="editForm.equipmentName" />
+          <el-input v-model="editForm.equipmentName" placeholder="请输入设备名称" maxlength="50" />
+        </el-form-item>
+        <el-form-item label="设备型号">
+          <el-input v-model="editForm.equipmentModel" placeholder="请输入设备型号" maxlength="100" />
         </el-form-item>
         <el-form-item label="设备类型" prop="equipmentType">
           <el-input v-model="editForm.equipmentType" />
         </el-form-item>
         <el-form-item label="设备状态" prop="equipmentStatus">
           <el-radio-group v-model="editForm.equipmentStatus">
-            <el-radio :value="0">维修中</el-radio>
             <el-radio :value="1">空闲</el-radio>
-            <el-radio :value="2">被预约</el-radio>
-            <el-radio :value="3">已借用</el-radio>
+            <el-radio :value="0">维修中</el-radio>
             <el-radio :value="4">故障</el-radio>
           </el-radio-group>
+          <div class="form-tip">
+            <el-icon><InfoFilled /></el-icon>
+            <span>其他状态（被预约、已借用）由系统自动计算</span>
+          </div>
         </el-form-item>
         <el-form-item label="设备位置" prop="equipmentLocation">
           <el-input v-model="editForm.equipmentLocation" />
         </el-form-item>
         <el-form-item label="库存数量" prop="stockQuantity">
-          <el-input-number v-model="editForm.stockQuantity" :min="0" />
+          <NumberInput
+            v-model="editForm.stockQuantity"
+            :min="0"
+            :max="10000"
+          />
         </el-form-item>
         <el-form-item label="设备图片" prop="equipmentImage">
           <div class="avatar-upload-container">
@@ -326,14 +345,29 @@
         <el-form-item label="设备名称">
           <el-input v-model="borrowForm.equipmentName" disabled />
         </el-form-item>
+        <el-form-item label="设备型号">
+          <el-input v-model="borrowForm.equipmentModel" disabled />
+        </el-form-item>
         <el-form-item label="借用数量">
-          <el-input-number v-model="borrowForm.quantity" :min="1" :max="borrowForm.availableQuantity" />
+          <NumberInput
+            v-model="borrowForm.quantity"
+            :min="0"
+            :max="borrowForm.availableQuantity"
+          />
         </el-form-item>
         <el-form-item label="真实姓名">
-          <el-input v-model="borrowForm.realName" />
+          <el-input v-model="borrowForm.realName" disabled />
+          <div class="form-tip">
+            <el-icon><InfoFilled /></el-icon>
+            <span>账号绑定信息，如需修改请到个人中心更新</span>
+          </div>
         </el-form-item>
         <el-form-item label="联系电话">
-          <el-input v-model="borrowForm.phone" />
+          <el-input v-model="borrowForm.phone" disabled />
+          <div class="form-tip">
+            <el-icon><InfoFilled /></el-icon>
+            <span>账号绑定信息，如需修改请到个人中心更新</span>
+          </div>
         </el-form-item>
         <el-form-item label="借用理由">
           <el-input v-model="borrowForm.reason" type="textarea" :rows="3" />
@@ -342,6 +376,66 @@
       <template #footer>
         <el-button @click="showBorrowDialog = false">取消</el-button>
         <el-button type="primary" @click="handleBorrowSubmit">确定</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog
+      v-model="showReserveDialog"
+      title="预约设备"
+      width="500px"
+    >
+      <el-form
+        :model="reserveForm"
+        label-width="100px"
+      >
+        <el-form-item label="设备编号">
+          <el-input v-model="reserveForm.equipmentNumber" disabled />
+        </el-form-item>
+        <el-form-item label="设备名称">
+          <el-input v-model="reserveForm.equipmentName" disabled />
+        </el-form-item>
+        <el-form-item label="设备型号">
+          <el-input v-model="reserveForm.equipmentModel" disabled />
+        </el-form-item>
+        <el-form-item label="预约时间" required>
+          <el-date-picker
+            v-model="reserveForm.reserveTime"
+            type="datetime"
+            placeholder="选择预约时间"
+            format="YYYY-MM-DD HH:mm:ss"
+            value-format="YYYY-MM-DD HH:mm:ss"
+            style="width: 100%"
+          />
+        </el-form-item>
+        <el-form-item label="预约时长" required>
+          <NumberInput
+            v-model="reserveForm.reserveDuration"
+            :min="0"
+            :max="720"
+          />
+          小时（最多30天）
+        </el-form-item>
+        <el-form-item label="真实姓名">
+          <el-input v-model="reserveForm.realName" disabled />
+          <div class="form-tip">
+            <el-icon><InfoFilled /></el-icon>
+            <span>账号绑定信息，如需修改请到个人中心更新</span>
+          </div>
+        </el-form-item>
+        <el-form-item label="联系电话">
+          <el-input v-model="reserveForm.phone" disabled />
+          <div class="form-tip">
+            <el-icon><InfoFilled /></el-icon>
+            <span>账号绑定信息，如需修改请到个人中心更新</span>
+          </div>
+        </el-form-item>
+        <el-form-item label="预约用途">
+          <el-input v-model="reserveForm.purpose" type="textarea" :rows="3" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showReserveDialog = false">取消</el-button>
+        <el-button type="primary" @click="handleReserveSubmit">确定</el-button>
       </template>
     </el-dialog>
 
@@ -361,6 +455,34 @@
         </el-form-item>
         <el-form-item label="设备名称">
           <el-input v-model="repairForm.equipmentName" disabled />
+        </el-form-item>
+        <el-form-item label="设备型号">
+          <el-input v-model="repairForm.equipmentModel" disabled />
+        </el-form-item>
+        <el-form-item label="报修数量" prop="repairQuantity">
+          <NumberInput
+            v-model="repairForm.repairQuantity"
+            :min="0"
+            :max="isAdmin ? repairForm.stockQuantity : repairForm.borrowQuantity"
+          />
+          <div class="form-tip" style="margin-top: 5px; margin-left: 7px;">
+            <el-icon><InfoFilled /></el-icon>
+            <span>不要超过{{ isAdmin ? '库存数量' : '借出数量' }}</span>
+          </div>
+        </el-form-item>
+        <el-form-item label="真实姓名">
+          <el-input v-model="repairForm.realName" disabled />
+          <div class="form-tip">
+            <el-icon><InfoFilled /></el-icon>
+            <span>账号绑定信息，如需修改请到个人中心更新</span>
+          </div>
+        </el-form-item>
+        <el-form-item label="联系电话">
+          <el-input v-model="repairForm.phone" disabled />
+          <div class="form-tip">
+            <el-icon><InfoFilled /></el-icon>
+            <span>账号绑定信息，如需修改请到个人中心更新</span>
+          </div>
         </el-form-item>
         <el-form-item label="故障图片">
           <el-upload
@@ -417,13 +539,19 @@
 </template>
 
 <script>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, onUnmounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import service from '@/api/request'
-import { Search, UploadFilled } from '@element-plus/icons-vue'
+import { websocketClient } from '@/utils/websocket'
+import { Search, UploadFilled, InfoFilled } from '@element-plus/icons-vue'
+import NumberInput from '@/components/NumberInput.vue'
 
 export default {
   name: 'EquipmentList',
+  components: {
+    NumberInput
+  },
   setup() {
     const loading = ref(false)
     const searchText = ref('')
@@ -432,22 +560,25 @@ export default {
     const showEditDialog = ref(false)
     const showViewDialog = ref(false)
     const showBorrowDialog = ref(false)
+    const showReserveDialog = ref(false)
     const showRepairDialog = ref(false)
     const equipmentList = ref([])
     const editFormRef = ref(null)
     const repairFormRef = ref(null)
-    const isAdmin = ref(true)
+    const isAdmin = ref(localStorage.getItem('isAdministrator') === 'true')
     const showManagement = ref(false)
     const tableRef = ref(null)
     const selectedRowIds = ref(new Set())
     const fileList = ref([])
     const repairFileList = ref([])
     const defaultImage = require('@/assets/default_equipment.png')
+    const router = useRouter()
 
     const editForm = reactive({
       id: null,
       equipmentNumber: '',
       equipmentName: '',
+      equipmentModel: '',
       equipmentType: '',
       equipmentTypeId: null,
       equipmentStatus: 1,
@@ -462,11 +593,16 @@ export default {
     const viewForm = reactive({
       equipmentNumber: '',
       equipmentName: '',
+      equipmentModel: '',
       equipmentType: '',
       equipmentTypeId: null,
       equipmentStatus: 1,
       equipmentLocation: '',
       stockQuantity: 0,
+      availableQuantity: 0,
+      borrowQuantity: 0,
+      unavailableQuantity: 0,
+      reserveQuantity: 0,
       equipmentCreateTime: '',
       description: '',
       supplier: '',
@@ -478,17 +614,38 @@ export default {
       id: null,
       equipmentNumber: '',
       equipmentName: '',
-      quantity: 1,
+      equipmentModel: '',
+      quantity: 0,
       availableQuantity: 0,
       realName: '',
       phone: '',
       reason: ''
     })
 
+    const reserveForm = reactive({
+      id: null,
+      equipmentTypeId: null,
+      equipmentNumber: '',
+      equipmentName: '',
+      equipmentModel: '',
+      reserveTime: null,
+      reserveDuration: 0,
+      realName: '',
+      phone: '',
+      purpose: ''
+    })
+
     const repairForm = reactive({
       id: null,
       equipmentNumber: '',
       equipmentName: '',
+      equipmentModel: '',
+      repairQuantity: 0,
+      availableQuantity: 0,
+      borrowQuantity: 0,
+      stockQuantity: 0,
+      realName: '',
+      phone: '',
       faultDescription: '',
       faultImageList: []
     })
@@ -509,6 +666,22 @@ export default {
     })
 
     const repairRules = reactive({
+      repairQuantity: [
+        { required: true, message: '请输入报修数量', trigger: 'blur' },
+        { 
+          validator: (rule, value, callback) => {
+            const maxQuantity = isAdmin.value ? repairForm.stockQuantity : repairForm.borrowQuantity
+            if (!value || value <= 0) {
+              callback(new Error('报修数量必须大于0'))
+            } else if (value > maxQuantity) {
+              callback(new Error(isAdmin.value ? '报修数量不能超过库存数量' : '报修数量不能超过借出数量'))
+            } else {
+              callback()
+            }
+          }, 
+          trigger: 'blur' 
+        }
+      ],
       faultDescription: [
         { required: true, message: '请描述故障情况', trigger: 'blur' }
       ]
@@ -541,6 +714,7 @@ export default {
         editForm.id = res.data.id
         editForm.equipmentNumber = res.data.equipmentNumber
         editForm.equipmentName = res.data.equipmentName
+        editForm.equipmentModel = res.data.equipmentModel || ''
         editForm.equipmentType = res.data.equipmentType
         editForm.equipmentTypeId = res.data.equipmentTypeId
         editForm.equipmentStatus = res.data.equipmentStatus
@@ -576,11 +750,16 @@ export default {
     const handleView = (row) => {
       viewForm.equipmentNumber = row.equipmentNumber
       viewForm.equipmentName = row.equipmentName
+      viewForm.equipmentModel = row.equipmentModel || ''
       viewForm.equipmentType = row.equipmentType
       viewForm.equipmentTypeId = row.equipmentTypeId
       viewForm.equipmentStatus = row.equipmentStatus
       viewForm.equipmentLocation = row.equipmentLocation
       viewForm.stockQuantity = row.stockQuantity
+      viewForm.availableQuantity = row.availableQuantity
+      viewForm.borrowQuantity = row.borrowQuantity
+      viewForm.unavailableQuantity = row.unavailableQuantity
+      viewForm.reserveQuantity = row.reserveQuantity
       viewForm.equipmentCreateTime = row.equipmentCreateTime ? formatDate(row.equipmentCreateTime) : '-'
       viewForm.description = row.description
       viewForm.supplier = row.supplier || '未设置'
@@ -593,14 +772,109 @@ export default {
       borrowForm.id = row.id
       borrowForm.equipmentNumber = row.equipmentNumber
       borrowForm.equipmentName = row.equipmentName
+      borrowForm.equipmentModel = row.equipmentModel || ''
       borrowForm.availableQuantity = row.availableQuantity || row.stockQuantity
+      borrowForm.realName = localStorage.getItem('realName') || ''
+      borrowForm.phone = localStorage.getItem('phone') || ''
+      borrowForm.reason = ''
       showBorrowDialog.value = true
+    }
+
+    const handleReserve = (row) => {
+      reserveForm.id = row.id
+      reserveForm.equipmentTypeId = row.equipmentTypeId
+      reserveForm.equipmentNumber = row.equipmentNumber
+      reserveForm.equipmentName = row.equipmentName
+      reserveForm.equipmentModel = row.equipmentModel || ''
+      reserveForm.reserveTime = null
+      reserveForm.reserveDuration = 0
+      reserveForm.realName = localStorage.getItem('realName') || ''
+      reserveForm.phone = localStorage.getItem('phone') || ''
+      reserveForm.purpose = ''
+      showReserveDialog.value = true
+    }
+
+    const handleReserveSubmit = async () => {
+      try {
+        if (!reserveForm.reserveTime) {
+          ElMessage.warning('请选择预约时间')
+          return
+        }
+        const reserveTimeDate = new Date(reserveForm.reserveTime)
+        const now = new Date()
+        if (reserveTimeDate <= now) {
+          ElMessage.warning('预约时间必须是未来时间')
+          return
+        }
+        if (!reserveForm.reserveDuration || reserveForm.reserveDuration <= 0) {
+          ElMessage.warning('请输入有效的预约时长（至少1小时）')
+          return
+        }
+        if (!reserveForm.realName) {
+          ElMessage.warning('请输入真实姓名')
+          return
+        }
+        if (!reserveForm.phone) {
+          ElMessage.warning('请输入联系电话')
+          return
+        }
+        if (!reserveForm.purpose) {
+          ElMessage.warning('请输入预约用途')
+          return
+        }
+        
+        const checkRes = await service.get('/lifecycle/reserve/check-conflict', {
+          params: {
+            equipmentId: reserveForm.id,
+            reserveTime: reserveForm.reserveTime,
+            reserveDuration: reserveForm.reserveDuration
+          }
+        })
+        if (checkRes.code === 200 && checkRes.data) {
+          ElMessage.warning('该时段设备已被预约，请选择其他时间')
+          return
+        }
+        
+        const res = await service.post('/lifecycle/reserve', {
+          equipmentId: reserveForm.id,
+          equipmentTypeId: reserveForm.equipmentTypeId,
+          equipmentNumber: reserveForm.equipmentNumber,
+          equipmentName: reserveForm.equipmentName,
+          reserveTime: reserveForm.reserveTime,
+          reserveDuration: reserveForm.reserveDuration,
+          realName: reserveForm.realName,
+          phone: reserveForm.phone,
+          purpose: reserveForm.purpose
+        })
+        if (res.code === 200) {
+          ElMessage.success(res.data || '预约申请已提交，等待管理员审核')
+          showReserveDialog.value = false
+          reserveForm.reserveTime = null
+          reserveForm.reserveDuration = 0
+          reserveForm.realName = localStorage.getItem('realName') || ''
+          reserveForm.phone = localStorage.getItem('phone') || ''
+          reserveForm.purpose = ''
+          getEquipmentList()
+          router.push('/platform/user/reserve')
+        } else {
+          ElMessage.error(res.msg || '设备预约失败')
+        }
+      } catch (err) {
+        console.error('设备预约失败:', err)
+        ElMessage.error('设备预约失败')
+      }
     }
 
     const handleRepair = (row) => {
       repairForm.id = row.id
       repairForm.equipmentNumber = row.equipmentNumber
       repairForm.equipmentName = row.equipmentName
+      repairForm.equipmentModel = row.equipmentModel || ''
+      repairForm.availableQuantity = row.availableQuantity || 0
+      repairForm.borrowQuantity = row.borrowQuantity || 0
+      repairForm.stockQuantity = row.stockQuantity || 0
+      repairForm.realName = localStorage.getItem('realName') || ''
+      repairForm.phone = localStorage.getItem('phone') || ''
       repairForm.faultDescription = ''
       repairForm.faultImageList = []
       repairFileList.value = []
@@ -612,15 +886,21 @@ export default {
         await repairFormRef.value.validate()
         const res = await service.post('/lifecycle/repair', {
           equipmentId: repairForm.id,
+          equipmentNumber: repairForm.equipmentNumber,
+          equipmentName: repairForm.equipmentName,
+          realName: repairForm.realName,
+          phone: repairForm.phone,
+          repairQuantity: repairForm.repairQuantity,
           faultDescription: repairForm.faultDescription,
-          faultImageList: repairForm.faultImageList,
-          repairQuantity: 1 // 默认报修数量为1
+          faultImageList: repairForm.faultImageList
         })
         if (res.code === 200) {
           ElMessage.success('报修申请提交成功')
           showRepairDialog.value = false
           repairForm.faultImageList = []
           repairFileList.value = []
+          repairForm.repairQuantity = 1
+          router.push('/platform/user/repair')
         } else {
           ElMessage.error(res.msg || '报修申请提交失败')
         }
@@ -632,11 +912,29 @@ export default {
 
     const handleBorrowSubmit = async () => {
       try {
-        const res = await service.post(`/equipment/${borrowForm.id}/borrow`, borrowForm)
+        if (!borrowForm.quantity || borrowForm.quantity <= 0) {
+          ElMessage.warning('请输入有效的借用数量（至少1）')
+          return
+        }
+        if (borrowForm.quantity > borrowForm.availableQuantity) {
+          ElMessage.warning('借用数量不能超过可用数量')
+          return
+        }
+        const res = await service.post('/lifecycle/borrow', {
+          equipmentId: borrowForm.id,
+          equipmentNumber: borrowForm.equipmentNumber,
+          equipmentName: borrowForm.equipmentName,
+          realName: borrowForm.realName,
+          phone: borrowForm.phone,
+          borrowQuantity: borrowForm.borrowQuantity,
+          expectReturnTime: borrowForm.expectReturnTime,
+          purpose: borrowForm.reason
+        })
         if (res.code === 200) {
           ElMessage.success('设备借用成功')
           showBorrowDialog.value = false
           getEquipmentList()
+          router.push('/platform/user/borrow')
         } else {
           ElMessage.error(res.msg || '设备借用失败')
         }
@@ -808,26 +1106,34 @@ export default {
       return date.toLocaleString('zh-CN')
     }
 
-    const getStatusText = (status) => {
-      const statusMap = {
+    const getStatusText = (equipmentStatus, stockQuantity, availableQuantity, borrowQuantity, reserveQuantity = 0) => {
+      const manualStatusMap = {
         0: '维修中',
-        1: '空闲',
-        2: '被预约',
-        3: '已借用',
         4: '故障'
       }
-      return statusMap[status] || '未知'
+      if (manualStatusMap[equipmentStatus]) {
+        return manualStatusMap[equipmentStatus]
+      }
+      if (!stockQuantity || stockQuantity === 0) return '无库存'
+      if (availableQuantity === 0) return '已满'
+      if (borrowQuantity > 0) return `已借出${borrowQuantity}台`
+      if (reserveQuantity > 0) return `部分预约`
+      return '空闲'
     }
 
-    const getStatusType = (status) => {
-      const typeMap = {
+    const getStatusType = (equipmentStatus, stockQuantity, availableQuantity, borrowQuantity, reserveQuantity = 0) => {
+      const manualTypeMap = {
         0: 'warning',
-        1: 'success',
-        2: 'primary',
-        3: 'info',
         4: 'danger'
       }
-      return typeMap[status] || 'info'
+      if (manualTypeMap[equipmentStatus]) {
+        return manualTypeMap[equipmentStatus]
+      }
+      if (!stockQuantity || stockQuantity === 0) return 'info'
+      if (availableQuantity === 0) return 'danger'
+      if (borrowQuantity > 0) return 'primary'
+      if (reserveQuantity > 0) return 'primary'
+      return 'success'
     }
 
     const getEquipmentTypeText = (typeId) => {
@@ -866,9 +1172,24 @@ export default {
       await getEquipmentList()
     }
 
-    onMounted(() => {
-      getEquipmentList()
+    onMounted(async () => {
+      await getEquipmentList()
       getEquipmentTypeList()
+      websocketClient.on('reservation_refresh', handleWsMessage)
+      websocketClient.on('borrow_refresh', handleWsMessage)
+      websocketClient.on('repair_refresh', handleWsMessage)
+      websocketClient.on('return_refresh', handleWsMessage)
+    })
+
+    const handleWsMessage = () => {
+      getEquipmentList()
+    }
+
+    onUnmounted(() => {
+      websocketClient.off('reservation_refresh', handleWsMessage)
+      websocketClient.off('borrow_refresh', handleWsMessage)
+      websocketClient.off('repair_refresh', handleWsMessage)
+      websocketClient.off('return_refresh', handleWsMessage)
     })
 
     const getEquipmentTypeList = async () => {
@@ -888,6 +1209,7 @@ export default {
       showEditDialog,
       showViewDialog,
       showBorrowDialog,
+      showReserveDialog,
       showRepairDialog,
       equipmentList,
       editFormRef,
@@ -895,6 +1217,7 @@ export default {
       editForm,
       viewForm,
       borrowForm,
+      reserveForm,
       repairForm,
       pagination,
       editRules,
@@ -910,6 +1233,8 @@ export default {
       handleView,
       handleBorrow,
       handleBorrowSubmit,
+      handleReserve,
+      handleReserveSubmit,
       handleRepair,
       handleRepairSubmit,
       handleDelete,
@@ -935,6 +1260,7 @@ export default {
       handleCurrentChange,
       Search,
       UploadFilled,
+      InfoFilled,
       defaultImage,
       fileList,
       repairFileList
@@ -983,9 +1309,15 @@ export default {
 
 .management-bar {
   display: flex;
-  gap: 10px;
+  gap: 12px;
   align-items: center;
   flex-wrap: wrap;
+  padding: 15px;
+  margin-top: 15px;
+  margin-bottom: 20px;
+  background: var(--bg-color);
+  border-radius: 8px;
+  border: 1px solid var(--main-border);
 }
 
 .equipment-image {
@@ -1109,6 +1441,15 @@ export default {
     max-height: 200px;
     object-fit: contain;
   }
+}
+
+.form-tip {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: #909399;
+  margin-top: 5px;
 }
 </style>
 

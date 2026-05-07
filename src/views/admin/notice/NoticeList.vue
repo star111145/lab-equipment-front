@@ -94,34 +94,6 @@
             placeholder="请输入公告内容"
           />
         </el-form-item>
-        <el-form-item label="发布人" prop="creatorId" v-if="dialogTitle === '创建公告'">
-          <el-select
-            v-model="form.creatorId"
-            placeholder="请选择发布人"
-            style="width: 100%"
-          >
-            <el-option
-              v-for="item in managerList"
-              :key="item.id"
-              :label="item.label"
-              :value="item.id"
-            />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="修改人" prop="updaterId" v-if="dialogTitle === '编辑公告'">
-          <el-select
-            v-model="form.updaterId"
-            placeholder="请选择修改人"
-            style="width: 100%"
-          >
-            <el-option
-              v-for="item in managerList"
-              :key="item.id"
-              :label="item.label"
-              :value="item.id"
-            />
-          </el-select>
-        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
@@ -154,7 +126,6 @@ export default {
     const dialogTitle = ref('创建公告')
     const formRef = ref(null)
     const submitLoading = ref(false)
-    const managerList = ref([])
     const searchText = ref('')
     
     const form = reactive({
@@ -182,19 +153,7 @@ export default {
       content: [
         { required: true, message: '请输入公告内容', trigger: 'blur' },
         { min: 1, max: 1000, message: '内容长度不能超过1000个字符', trigger: 'blur' }
-      ],
-      creatorId: [
-        { required: true, message: '请选择发布人', trigger: 'change' }
       ]
-    }
-    
-    const loadManagerList = async () => {
-      try {
-        const res = await service.get('/user/managers')
-        managerList.value = res.data || []
-      } catch (error) {
-        console.error('获取管理员列表失败:', error)
-      }
     }
     
     const getNoticeList = async () => {
@@ -233,10 +192,10 @@ export default {
       form.id = null
       form.title = ''
       form.content = ''
-      form.creatorId = null
+      const currentUserId = localStorage.getItem('userId') ? parseInt(localStorage.getItem('userId')) : null
+      form.creatorId = currentUserId
       form.updaterId = null
       dialogVisible.value = true
-      loadManagerList()
     }
     
     const handleEdit = (row) => {
@@ -245,9 +204,9 @@ export default {
       form.title = row.title
       form.content = row.content
       form.creatorId = row.creatorId
-      form.updaterId = null
+      const currentUserId = localStorage.getItem('userId') ? parseInt(localStorage.getItem('userId')) : null
+      form.updaterId = currentUserId
       dialogVisible.value = true
-      loadManagerList()
     }
     
     const handleView = (row) => {
@@ -330,7 +289,6 @@ export default {
       dialogTitle,
       formRef,
       submitLoading,
-      managerList,
       getNoticeList,
       searchText,
       form,

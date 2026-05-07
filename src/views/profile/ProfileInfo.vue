@@ -11,7 +11,8 @@
       <p>查看和管理个人信息</p>
     </div>
     <div class="content">
-      <div class="profile-layout">
+      <el-card class="profile-card">
+        <div class="profile-layout">
         <div class="profile-sidebar">
           <div class="sidebar-avatar">
             <el-avatar
@@ -107,7 +108,8 @@
             <el-button link type="primary" @click="showPasswordDialog = true" style="margin-left: 20px;">修改密码</el-button>
           </div>
         </div>
-      </div>
+        </div>
+      </el-card>
     </div>
 
     <el-dialog
@@ -606,30 +608,10 @@ export default {
   font-size: 14px;
 }
 
-.content {
-  margin-top: 20px;
-  padding: 20px;
-  background: #f5f7fa;
+.profile-card {
+  border: none;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
   border-radius: 8px;
-  min-height: 400px;
-}
-
-.profile-header {
-  display: flex;
-  align-items: center;
-  gap: 30px;
-  margin-bottom: 30px;
-  padding: 20px;
-  background: #fff;
-  border-radius: 8px;
-}
-
-.profile-avatar {
-  flex-shrink: 0;
-}
-
-.profile-gender {
-  flex: 1;
 }
 
 .profile-layout {
@@ -707,6 +689,8 @@ export default {
 
 .profile-main {
   flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 
 .info-card {
@@ -714,6 +698,7 @@ export default {
   border-radius: 8px;
   padding: 30px;
   margin-bottom: 20px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
 }
 
 .card-section {
@@ -798,4 +783,5 @@ export default {
     font-size: 13px;
   }
 }
+
 </style>

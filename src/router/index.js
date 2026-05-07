@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import Login from '@/views/LoginPage.vue'
 import Platform from '@/components/PlatformLayout.vue'
 import HomePage from '@/views/HomePage.vue'
+import MenuPrompt from '@/components/MenuPrompt.vue'
 import EquipmentList from '@/views/equipment/EquipmentList.vue'
 import EquipmentBorrow from '@/views/admin/management/EquipmentBorrow.vue'
 import EquipmentRepair from '@/views/admin/management/EquipmentRepair.vue'
@@ -21,6 +22,7 @@ import SupplierInfo from '@/views/admin/supplier/SupplierInfo.vue'
 import NoticeList from '@/views/admin/notice/NoticeList.vue'  
 import SystemConfig from '@/views/admin/system/SystemConfig.vue'
 import NotFound from '@/views/error/NotFound.vue'
+import { checkTokenExpire } from '@/utils/auth'
 
 const routes = [
   {
@@ -41,6 +43,14 @@ const routes = [
       {
         path: 'home',
         component: HomePage
+      },
+      {
+        path: 'notice',
+        component: () => import('@/views/NoticeDetail.vue')
+      },
+      {
+        path: 'menu',
+        component: MenuPrompt
       },
       {
         path: 'equipment',
@@ -169,6 +179,11 @@ router.beforeEach((to) => {
   
   if (to.meta.role && role !== to.meta.role) {
     return '/platform/home'
+  }
+  
+  // 检查token是否有效（防止用户手动删除token后直接访问页面）
+  if (to.meta.requiresAuth && token) {
+    checkTokenExpire()
   }
 })
 

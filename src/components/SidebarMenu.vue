@@ -13,10 +13,6 @@
       router
       class="sidebar-menu"
     >
-      <el-menu-item v-if="showMenu('home')" index="/platform/home">
-        <el-icon><House /></el-icon>
-        <span>首页</span>
-      </el-menu-item>
       <el-sub-menu v-if="showMenu('equipment')" index="1">
         <template #title>
           <el-icon><Folder /></el-icon>
@@ -89,7 +85,6 @@
 import { computed, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import {
-  House,
   Folder,
   Document,
   Notebook,
@@ -164,7 +159,6 @@ export default {
       showSupplierMenu,
       showNoticeMenu,
       showSystemMenu,
-      House,
       Folder,
       Document,
       Notebook,

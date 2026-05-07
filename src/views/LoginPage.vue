@@ -159,6 +159,7 @@ import { useRouter } from 'vue-router'
 import { User, Lock, View, Hide, TrendCharts, ChatLineRound, VideoCamera, Close } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import service from '@/api/request'
+import { setUserInfo } from '@/utils/auth'
 
 export default {
   name: 'LoginPage',
@@ -295,12 +296,17 @@ export default {
                 return
               }
               
-              localStorage.setItem('token', res.data.token)
-              localStorage.setItem('userId', res.data.userId)
-              localStorage.setItem('username', res.data.username)
-              localStorage.setItem('realName', res.data.realName)
-              localStorage.setItem('role', userRole)
-              localStorage.setItem('isAdministrator', userIsAdmin)
+              const userData = {
+                token: res.data.token,
+                userId: res.data.userId,
+                username: res.data.username,
+                realName: res.data.realName,
+                phone: res.data.phone,
+                role: userRole,
+                isAdministrator: userIsAdmin,
+                tokenExpireTime: res.data.tokenExpireTime
+              }
+              setUserInfo(userData)
               
               ElMessage({
                 message: '登录成功！',

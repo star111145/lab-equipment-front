@@ -1,18 +1,67 @@
 <template>
   <div class="equipment-repair">
     <div class="page-header">
-      <h2>设备报修</h2>
+      <h2>报修管理</h2>
       <p>管理设备报修记录</p>
     </div>
     <div class="content">
       <div class="toolbar">
         <el-select v-model="searchStatus" placeholder="报修状态" clearable style="width: 150px" @change="getRepairList">
+          <el-option label="全部" :value="-1" />
           <el-option label="待审核" :value="0" />
           <el-option label="报修中" :value="1" />
-          <el-option label="维修中" :value="2" />
-          <el-option label="已完成" :value="3" />
-          <el-option label="已拒绝" :value="4" />
+          <el-option label="已维修" :value="2" />
+          <el-option label="已拒绝" :value="3" />
+          <el-option label="已取消" :value="4" />
         </el-select>
+        <el-select
+          v-model="searchAuditStatus"
+          placeholder="审核状态"
+          clearable
+          style="width: 150px; margin-left: 20px;"
+          @change="getRepairList"
+        >
+          <el-option label="全部" :value="-1" />
+          <el-option label="待审核" :value="0" />
+          <el-option label="已通过" :value="1" />
+          <el-option label="已拒绝" :value="2" />
+        </el-select>
+        <el-input
+          v-model="searchKeyword"
+          placeholder="搜索设备编号/设备名称/报修人"
+          clearable
+          style="width: 300px; margin-left: 20px;"
+          @input="getRepairList"
+        >
+          <template #suffix>
+            <el-icon><Search /></el-icon>
+          </template>
+        </el-input>
+        <el-button
+          v-if="!showManagement"
+          type="primary"
+          @click="showManagement = true"
+          style="margin-left: auto;"
+        >
+          管理
+        </el-button>
+      </div>
+
+      <div v-if="showManagement" class="management-bar">
+        <el-button type="success">
+          导出Excel
+        </el-button>
+        <el-button type="primary">
+          统计报表
+        </el-button>
+        <el-button type="danger" :disabled="selectedRowIds.size === 0">
+          批量删除 ({{ selectedRowIds.size }})
+        </el-button>
+        <el-button type="info" @click="handleSelectAll">全选当前页</el-button>
+        <el-button type="info" @click="handleDeselectAll">取消全选</el-button>
+        <el-button type="info" @click="showManagement = false">
+          返回
+        </el-button>
       </div>
 
       <el-table
@@ -20,51 +69,40 @@
         :data="repairList"
         style="width: 100%; margin-top: 20px"
         border
+        @selection-change="handleSelectionChange"
       >
+        <el-table-column v-if="showManagement" type="selection" width="55" align="center" />
         <el-table-column type="index" label="序号" width="60" align="center" />
         <el-table-column prop="equipmentNumber" label="设备编号" width="120" />
-        <el-table-column prop="equipmentName" label="设备名称" width="150" />
-        <el-table-column prop="equipmentImage" label="设备图片" width="100">
+        <el-table-column prop="equipmentName" label="设备名称" width="140" />
+        <el-table-column prop="equipmentModel" label="设备型号" width="140" />
+        <el-table-column prop="repairQuantity" label="报修数量" width="100" />
+        <el-table-column prop="equipmentTypeName" label="设备类型" width="120" />
+        <el-table-column label="设备图片" width="100" align="center">
           <template #default="{ row }">
-            <el-avatar
-              v-if="row.equipmentImage && row.equipmentImage !== ''"
-              :src="row.equipmentImage"
-              size="large"
-              shape="square"
-              class="equipment-avatar"
-              @error="handleImageError"
-            />
-            <el-avatar
-              v-else
-              size="large"
-              shape="square"
-              :src="defaultImage"
-              class="equipment-avatar"
+            <el-image
+              :src="row.equipmentImage || defaultImage"
+              fit="cover"
+              style="width: 60px; height: 60px; border-radius: 4px"
+              :preview-src-list="row.equipmentImage ? [row.equipmentImage] : []"
             />
           </template>
         </el-table-column>
         <el-table-column prop="realName" label="报修人" width="100" />
         <el-table-column prop="phone" label="联系电话" width="130" />
         <el-table-column prop="faultDescription" label="故障说明" min-width="200" />
-        <el-table-column prop="faultImage" label="故障图片" width="100">
-          <template #default="{ row }">
-            <el-avatar
-              v-if="row.faultImageList && row.faultImageList.length > 0"
-              :src="row.faultImageList[0]"
-              size="large"
-              shape="square"
-              class="equipment-avatar"
-              @error="handleImageError"
-            />
-            <el-avatar
-              v-else
-              size="large"
-              shape="square"
-              :src="defaultImage"
-              class="equipment-avatar"
-            />
-          </template>
-        </el-table-column>
+        <el-table-column label="故障图片" width="100" align="center">
+           <template #default="{ row }">
+             <el-image
+               v-if="row.faultImageList && row.faultImageList.length > 0"
+               :src="row.faultImageList[0]"
+               fit="cover"
+               style="width: 60px; height: 60px; border-radius: 4px"
+               :preview-src-list="row.faultImageList"
+             />
+             <span v-else>-</span>
+           </template>
+         </el-table-column>
         <el-table-column prop="repairStatus" label="报修状态" width="100">
           <template #default="{ row }">
             <el-tag :type="getStatusType(row.repairStatus)">
@@ -79,19 +117,30 @@
             </el-tag>
           </template>
         </el-table-column>
+        <el-table-column label="审核人" width="100">
+          <template #default="{ row }">
+            {{ row.auditUserName || '-' }}
+          </template>
+        </el-table-column>
+        <el-table-column label="审核时间" width="160">
+          <template #default="{ row }">
+            {{ row.auditTime ? formatDate(row.auditTime) : '-' }}
+          </template>
+        </el-table-column>
         <el-table-column prop="repairTime" label="报修时间" width="180">
           <template #default="{ row }">
             {{ row.repairTime ? formatDate(row.repairTime) : '-' }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="200" fixed="right" align="center">
+        <el-table-column label="操作" width="250" fixed="right" align="center">
           <template #default="{ row }">
             <el-button type="primary" link @click="handleView(row)">详情</el-button>
             <template v-if="isAdmin">
-              <el-button v-if="row.auditStatus === 0" type="success" link @click="handleAudit(row)">审核</el-button>
-              <el-button v-if="row.repairStatus === 1 || row.repairStatus === 2" type="warning" link @click="handleUpdateStatus(row)">更新状态</el-button>
+              <el-button v-if="row.auditStatus === 0" type="success" link @click="handleAudit(row, 1)">通过</el-button>
+              <el-button v-if="row.auditStatus === 0" type="danger" link @click="handleAudit(row, 2)">拒绝</el-button>
+              <el-button v-if="row.auditStatus === 1 && row.repairStatus === 1" type="primary" link @click="handleUpdateStatus(row)">更新状态</el-button>
+              <el-button type="warning" link @click="handleCancel(row)">取消</el-button>
             </template>
-            <el-button type="danger" link @click="handleDelete(row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -117,6 +166,9 @@
         <el-descriptions :column="2" border>
           <el-descriptions-item label="设备编号">{{ viewForm.equipmentNumber || '-' }}</el-descriptions-item>
           <el-descriptions-item label="设备名称">{{ viewForm.equipmentName || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="设备型号">{{ viewForm.equipmentModel || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="报修数量">{{ viewForm.repairQuantity || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="设备类型">{{ viewForm.equipmentTypeName || '-' }}</el-descriptions-item>
           <el-descriptions-item label="报修人">{{ viewForm.realName || '-' }}</el-descriptions-item>
           <el-descriptions-item label="联系电话">{{ viewForm.phone || '-' }}</el-descriptions-item>
           <el-descriptions-item label="报修状态">
@@ -130,6 +182,8 @@
             </el-tag>
           </el-descriptions-item>
           <el-descriptions-item label="报修时间">{{ viewForm.repairTime ? formatDate(viewForm.repairTime) : '-' }}</el-descriptions-item>
+          <el-descriptions-item label="审核人">{{ viewForm.auditUserName || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="审核时间">{{ viewForm.auditTime ? formatDate(viewForm.auditTime) : '-' }}</el-descriptions-item>
           <el-descriptions-item label="审核结果">{{ viewForm.auditResult || '-' }}</el-descriptions-item>
           <el-descriptions-item label="故障说明" :span="2">{{ viewForm.faultDescription || '-' }}</el-descriptions-item>
           <el-descriptions-item label="故障图片" :span="2">
@@ -152,48 +206,18 @@
     </el-dialog>
 
     <el-dialog
-      v-model="showAuditDialog"
-      title="审核报修"
-      width="500px"
-    >
-      <el-form
-        ref="auditFormRef"
-        :model="auditForm"
-        label-width="100px"
-      >
-        <el-form-item label="设备编号">
-          <el-input v-model="auditForm.equipmentNumber" disabled />
-        </el-form-item>
-        <el-form-item label="设备名称">
-          <el-input v-model="auditForm.equipmentName" disabled />
-        </el-form-item>
-        <el-form-item label="故障说明">
-          <el-input v-model="auditForm.faultDescription" type="textarea" :rows="3" disabled />
-        </el-form-item>
-        <el-form-item label="审核结果" required>
-          <el-radio-group v-model="auditForm.auditStatus">
-            <el-radio :value="1">通过</el-radio>
-            <el-radio :value="2">拒绝</el-radio>
-          </el-radio-group>
-        </el-form-item>
-        <el-form-item label="审核意见">
-          <el-input v-model="auditForm.auditResult" type="textarea" :rows="3" placeholder="请输入审核意见" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="showAuditDialog = false">取消</el-button>
-        <el-button type="primary" @click="handleAuditSubmit">确定</el-button>
-      </template>
-    </el-dialog>
-
-    <el-dialog
       v-model="showStatusDialog"
       title="更新维修状态"
-      width="400px"
+      width="450px"
     >
+      <div style="margin-bottom: 15px; color: #909399; font-size: 13px;">
+        <p>• 已维修：维修完成，设备状态将恢复正常</p>
+        <p>• 已拒绝：拒绝维修，需要填写原因</p>
+      </div>
       <el-form
         ref="statusFormRef"
         :model="statusForm"
+        :rules="statusRules"
         label-width="100px"
       >
         <el-form-item label="当前状态">
@@ -201,11 +225,24 @@
             {{ getStatusText(statusForm.repairStatus) }}
           </el-tag>
         </el-form-item>
-        <el-form-item label="更新状态" required>
+        <el-form-item label="更新状态" required prop="newStatus">
           <el-radio-group v-model="statusForm.newStatus">
-            <el-radio :value="2">维修中</el-radio>
-            <el-radio :value="3">已完成</el-radio>
+            <el-radio :value="2">已维修</el-radio>
+            <el-radio :value="3">已拒绝</el-radio>
           </el-radio-group>
+        </el-form-item>
+        <el-form-item 
+          v-if="statusForm.newStatus === 3" 
+          label="原因" 
+          required 
+          prop="reason"
+        >
+          <el-input
+            v-model="statusForm.reason"
+            type="textarea"
+            :rows="3"
+            :placeholder="statusForm.newStatus === 3 ? '请输入拒绝原因' : '请输入取消原因'"
+          />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -217,28 +254,37 @@
 </template>
 
 <script>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, onUnmounted } from 'vue'
+import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import service from '@/api/request'
+import { websocketClient } from '@/utils/websocket'
 
 export default {
   name: 'EquipmentRepair',
   setup() {
+    const route = useRoute()
     const loading = ref(false)
     const searchStatus = ref(null)
+    const searchAuditStatus = ref(null)
+    const searchKeyword = ref('')
+    const showManagement = ref(false)
+    const selectedRowIds = ref(new Set())
     const repairList = ref([])
     const isAdmin = ref(true)
     const defaultImage = require('@/assets/default_equipment.png')
 
     const showViewDialog = ref(false)
-    const showAuditDialog = ref(false)
     const showStatusDialog = ref(false)
-    const auditFormRef = ref(null)
     const statusFormRef = ref(null)
 
     const viewForm = reactive({
       equipmentNumber: '',
       equipmentName: '',
+      equipmentModel: '',
+      equipmentTypeId: null,
+      equipmentImage: '',
+      repairQuantity: 0,
       realName: '',
       phone: '',
       faultDescription: '',
@@ -246,23 +292,25 @@ export default {
       repairStatus: 0,
       auditStatus: 0,
       auditResult: '',
+      auditUserName: '',
+      auditTime: '',
       repairTime: ''
-    })
-
-    const auditForm = reactive({
-      id: null,
-      equipmentNumber: '',
-      equipmentName: '',
-      faultDescription: '',
-      auditStatus: 1,
-      auditResult: ''
     })
 
     const statusForm = reactive({
       id: null,
       repairStatus: 0,
-      newStatus: 2
+      newStatus: 2,
+      reason: ''
     })
+
+    const statusRules = {
+      newStatus: [{ required: true, message: '请选择更新状态', trigger: 'change' }],
+      reason: [
+        { required: true, message: '请输入原因', trigger: 'blur' },
+        { min: 2, message: '原因至少2个字符', trigger: 'blur' }
+      ]
+    }
 
     const pagination = reactive({
       current: 1,
@@ -282,12 +330,12 @@ export default {
     }
 
     const getStatusType = (status) => {
-      const types = ['warning', 'info', 'primary', 'success', 'danger']
+      const types = ['info', 'warning', 'success', 'danger', 'info']
       return types[status] || 'info'
     }
 
     const getStatusText = (status) => {
-      const texts = ['待审核', '报修中', '维修中', '已完成', '已拒绝']
+      const texts = ['待审核', '报修中', '已维修', '已拒绝', '已取消']
       return texts[status] || '未知'
     }
 
@@ -302,7 +350,9 @@ export default {
           params: {
             current: pagination.current,
             size: pagination.size,
-            repairStatus: searchStatus.value
+            status: searchStatus.value,
+            auditStatus: searchAuditStatus.value,
+            keyword: searchKeyword.value
           }
         })
         repairList.value = res.data.records
@@ -315,67 +365,151 @@ export default {
       }
     }
 
-    const handleView = (row) => {
-      viewForm.equipmentNumber = row.equipmentNumber
-      viewForm.equipmentName = row.equipmentName
-      viewForm.realName = row.realName
-      viewForm.phone = row.phone
-      viewForm.faultDescription = row.faultDescription
-      viewForm.faultImageList = row.faultImageList || []
-      viewForm.repairStatus = row.repairStatus
-      viewForm.auditStatus = row.auditStatus
-      viewForm.auditResult = row.auditResult
-      viewForm.repairTime = row.repairTime
-      showViewDialog.value = true
+    const handleSelectionChange = (selection) => {
+      selectedRowIds.value = new Set(selection.map(item => item.id))
     }
 
-    const handleAudit = (row) => {
-      auditForm.id = row.id
-      auditForm.equipmentNumber = row.equipmentNumber
-      auditForm.equipmentName = row.equipmentName
-      auditForm.faultDescription = row.faultDescription
-      auditForm.auditStatus = 1
-      auditForm.auditResult = ''
-      showAuditDialog.value = true
+    const handleSelectAll = () => {
+      repairList.value.forEach(row => {
+        selectedRowIds.value.add(row.id)
+      })
+      ElMessage.success(`已选择当前页 ${repairList.value.length} 条记录`)
     }
 
-    const handleAuditSubmit = async () => {
-      try {
-        const res = await service.put(`/lifecycle/repair/${auditForm.id}/audit`, {
-          auditStatus: auditForm.auditStatus,
-          auditResult: auditForm.auditResult
-        })
-        if (res.code === 200) {
-          ElMessage.success('审核成功')
-          showAuditDialog.value = false
-          getRepairList()
+    const handleDeselectAll = () => {
+      selectedRowIds.value.clear()
+      ElMessage.success('已取消所有选择')
+    }
+
+    const handleView = async (row) => {
+      if (row && row.id) {
+        const repairId = row.id
+        const found = repairList.value.find(item => item.id === repairId)
+        if (found) {
+          Object.assign(viewForm, found)
+          showViewDialog.value = true
         } else {
-          ElMessage.error(res.msg || '审核失败')
+          try {
+            const res = await service.get(`/lifecycle/repair/${repairId}`)
+            if (res.code === 200 && res.data) {
+              Object.assign(viewForm, res.data)
+              showViewDialog.value = true
+            } else {
+              ElMessage.error('获取报修详情失败')
+            }
+          } catch (err) {
+            console.error('获取报修详情失败:', err)
+            ElMessage.error('获取报修详情失败')
+          }
         }
-      } catch (err) {
-        console.error('审核失败:', err)
-        ElMessage.error('审核失败')
+      } else {
+        viewForm.equipmentNumber = row.equipmentNumber
+        viewForm.equipmentName = row.equipmentName
+        viewForm.equipmentModel = row.equipmentModel
+        viewForm.equipmentTypeId = row.equipmentTypeId
+        viewForm.equipmentTypeName = row.equipmentTypeName
+        viewForm.equipmentImage = row.equipmentImage
+        viewForm.repairQuantity = row.repairQuantity
+        viewForm.realName = row.realName
+        viewForm.phone = row.phone
+        viewForm.faultDescription = row.faultDescription
+        viewForm.faultImageList = row.faultImageList || []
+        viewForm.repairStatus = row.repairStatus
+        viewForm.auditStatus = row.auditStatus
+        viewForm.auditResult = row.auditResult
+        viewForm.auditUserName = row.auditUserName
+        viewForm.auditTime = row.auditTime
+        viewForm.repairTime = row.repairTime
+        showViewDialog.value = true
+      }
+    }
+
+    const handleAudit = (row, status) => {
+      if (status === 1) {
+        ElMessageBox.confirm(`确定要通过这条报修记录吗？`, '提示', {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          type: 'warning'
+        }).then(async () => {
+          try {
+            const res = await service.put(`/lifecycle/repair/${row.id}/audit`, {
+              auditStatus: status,
+              auditResult: '已通过'
+            })
+            if (res.code === 200) {
+              ElMessage.success(res.data?.message || '通过成功')
+              if (res.data?.needRefresh) {
+                getRepairList()
+              }
+            } else {
+              ElMessage.error(res.msg || '操作失败')
+            }
+          } catch (err) {
+            console.error('操作失败:', err)
+            ElMessage.error('操作失败')
+          }
+        }).catch(() => {
+          ElMessage.info('已取消操作')
+        })
+      } else {
+        ElMessageBox.prompt('请输入拒绝理由：', '拒绝', {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          type: 'warning',
+          inputPattern: /\S+/,
+          inputErrorMessage: '拒绝理由不能为空'
+        }).then(async ({ value }) => {
+          try {
+            const res = await service.put(`/lifecycle/repair/${row.id}/audit`, {
+              auditStatus: status,
+              auditResult: value
+            })
+            if (res.code === 200) {
+              ElMessage.success(res.data?.message || '拒绝成功')
+              if (res.data?.needRefresh) {
+                getRepairList()
+              }
+            } else {
+              ElMessage.error(res.msg || '操作失败')
+            }
+          } catch (err) {
+            console.error('操作失败:', err)
+            ElMessage.error('操作失败')
+          }
+        }).catch(() => {
+          ElMessage.info('已取消操作')
+        })
       }
     }
 
     const handleUpdateStatus = (row) => {
       statusForm.id = row.id
       statusForm.repairStatus = row.repairStatus
-      statusForm.newStatus = row.repairStatus === 1 ? 2 : 3
+      statusForm.newStatus = 2
+      statusForm.reason = ''
       showStatusDialog.value = true
     }
 
     const handleStatusSubmit = async () => {
       try {
+        await statusFormRef.value.validate()
+        
+        const params = {
+          status: statusForm.newStatus
+        }
+        if (statusForm.newStatus === 3) {
+          params.reason = statusForm.reason
+        }
+        
         const res = await service.put(`/lifecycle/repair/${statusForm.id}/status`, null, {
-          params: {
-            status: statusForm.newStatus
-          }
+          params
         })
         if (res.code === 200) {
-          ElMessage.success('状态更新成功')
+          ElMessage.success(res.data?.message || '状态更新成功')
           showStatusDialog.value = false
-          getRepairList()
+          if (res.data?.needRefresh) {
+            getRepairList()
+          }
         } else {
           ElMessage.error(res.msg || '状态更新失败')
         }
@@ -385,25 +519,29 @@ export default {
       }
     }
 
-    const handleDelete = (row) => {
-      ElMessageBox.confirm('确定要删除这条报修记录吗？', '提示', {
+    const handleCancel = (row) => {
+      ElMessageBox.prompt('请输入取消原因', '取消报修', {
         confirmButtonText: '确定',
         cancelButtonText: '取消',
-        type: 'warning'
-      }).then(async () => {
+        type: 'warning',
+        inputPattern: /.+/,
+        inputErrorMessage: '请输入取消原因'
+      }).then(async ({ value }) => {
         try {
-          const res = await service.delete(`/lifecycle/repair/${row.id}`)
+          const res = await service.put(`/lifecycle/repair/${row.id}/status`, null, {
+            params: { status: 4, reason: value }
+          })
           if (res.code === 200) {
-            ElMessage.success('删除成功')
+            ElMessage.success('取消成功')
             getRepairList()
           } else {
-            ElMessage.error(res.msg || '删除失败')
+            ElMessage.error(res.msg || '取消失败')
           }
         } catch (err) {
-          console.error('删除失败:', err)
-          ElMessage.error('删除失败')
+          console.error('取消失败:', err)
+          ElMessage.error('取消失败')
         }
-      })
+      }).catch(() => {})
     }
 
     const handleSizeChange = (val) => {
@@ -418,21 +556,45 @@ export default {
 
     onMounted(() => {
       getRepairList()
+      document.addEventListener('visibilitychange', handleVisibilityChange)
+      websocketClient.on('repair_refresh', handleWsMessage)
+      
+      const repairId = route.query.id
+      if (repairId) {
+        handleView({ id: repairId })
+      }
+    })
+
+    const handleWsMessage = () => {
+      getRepairList()
+    }
+
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        getRepairList()
+      }
+    }
+
+    onUnmounted(() => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      websocketClient.off('repair_refresh', handleWsMessage)
     })
 
     return {
       loading,
       searchStatus,
+      searchAuditStatus,
+      searchKeyword,
+      showManagement,
+      selectedRowIds,
       repairList,
       isAdmin,
       defaultImage,
       showViewDialog,
-      showAuditDialog,
       showStatusDialog,
-      auditFormRef,
       statusFormRef,
+      statusRules,
       viewForm,
-      auditForm,
       statusForm,
       pagination,
       formatDate,
@@ -440,12 +602,16 @@ export default {
       getStatusText,
       handleImageError,
       getRepairList,
+      handleSelectionChange,
+      handleSelectAll,
+      handleDeselectAll,
       handleView,
       handleAudit,
-      handleAuditSubmit,
+      handleVisibilityChange,
+      handleWsMessage,
       handleUpdateStatus,
       handleStatusSubmit,
-      handleDelete,
+      handleCancel,
       handleSizeChange,
       handleCurrentChange
     }
@@ -485,8 +651,21 @@ export default {
 
 .toolbar {
   display: flex;
-  gap: 10px;
+  gap: 12px;
   align-items: center;
+  flex-wrap: wrap;
+}
+
+.management-bar {
+  display: flex;
+  align-items: center;
+  margin-top: 15px;
+  margin-bottom: 20px;
+  padding: 15px;
+  background: var(--bg-color);
+  border-radius: 8px;
+  border: 1px solid var(--main-border);
+  gap: 12px;
   flex-wrap: wrap;
 }
 

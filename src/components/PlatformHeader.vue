@@ -55,15 +55,21 @@
           <el-icon class="el-icon--right"><ArrowDown /></el-icon>
         </span>
         <template #dropdown>
-          <el-dropdown-menu>
-            <el-dropdown-item command="profile">
-              <el-icon><User /></el-icon><span>个人中心</span>
-            </el-dropdown-item>
-            <el-dropdown-item command="logout" divided>
-              <el-icon><TurnOff /></el-icon><span>退出登录</span>
-            </el-dropdown-item>
-          </el-dropdown-menu>
-        </template>
+            <el-dropdown-menu>
+              <el-dropdown-item command="home">
+                <el-icon><House /></el-icon><span>首页</span>
+              </el-dropdown-item>
+              <el-dropdown-item command="menu">
+                <el-icon><Menu /></el-icon><span>功能菜单</span>
+              </el-dropdown-item>
+              <el-dropdown-item command="profile">
+                <el-icon><User /></el-icon><span>个人中心</span>
+              </el-dropdown-item>
+              <el-dropdown-item command="logout" divided>
+                <el-icon><TurnOff /></el-icon><span>退出登录</span>
+              </el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
       </el-dropdown>
     </div>
   </div>
@@ -81,7 +87,9 @@ import {
   TurnOff,
   Link,
   Switch,
-  ArrowDown
+  ArrowDown,
+  Menu,
+  House
 } from '@element-plus/icons-vue'
 
 export default {
@@ -108,8 +116,15 @@ export default {
 
     const handleCommand = (command) => {
       switch (command) {
+        case 'home':
+          router.push('/platform/home')
+          break
         case 'profile':
           router.push('/platform/profile/info')
+          break
+        case 'menu':
+          window.dispatchEvent(new CustomEvent('menu-toggle', { detail: true }))
+          router.push('/platform/menu')
           break
         case 'logout':
           service
@@ -146,7 +161,7 @@ export default {
     }
 
     const roleMenus = {
-      admin: ['home', 'equipment', 'borrow', 'return', 'repair', 'reserve', 'warehouse', 'supplier', 'department', 'system', 'notice'],
+      admin: ['home', 'equipment', 'borrow', 'return', 'repair', 'reserve', 'warehouse', 'supplier', 'department', 'system', 'notice', 'reserve-admin', 'borrow-admin', 'return-admin', 'repair-admin'],
       teacher: ['home', 'equipment', 'borrow', 'return', 'repair', 'reserve'],
       student: ['home', 'equipment', 'borrow', 'return', 'repair', 'reserve']
     }
@@ -162,13 +177,13 @@ export default {
         { path: '/platform/home', label: '首页', module: 'home' },
         { path: '/platform/equipment/list', label: '查找设备', module: 'equipment' },
         { path: '/platform/user/reserve', label: '我的预约', module: 'equipment' },
-        { path: '/platform/equipment/reserve', label: '预约管理', module: 'reserve' },
+        { path: '/platform/equipment/reserve', label: '预约管理', module: 'reserve-admin' },
         { path: '/platform/user/borrow', label: '我的借用', module: 'borrow' },
         { path: '/platform/user/return', label: '我的归还', module: 'return' },
-        { path: '/platform/equipment/borrow', label: '借用管理', module: 'borrow' },
-        { path: '/platform/equipment/return', label: '归还管理', module: 'return' },
+        { path: '/platform/equipment/borrow', label: '借用管理', module: 'borrow-admin' },
+        { path: '/platform/equipment/return', label: '归还管理', module: 'return-admin' },
         { path: '/platform/user/repair', label: '我的报修', module: 'repair' },
-        { path: '/platform/equipment/repair', label: '报修管理', module: 'repair' },
+        { path: '/platform/equipment/repair', label: '报修管理', module: 'repair-admin' },
         { path: '/platform/profile/info', label: '个人信息', module: 'profile' },
         { path: '/platform/user/list', label: '用户管理', module: 'user' },
         { path: '/platform/user/register', label: '用户注册', module: 'user' },
@@ -205,13 +220,13 @@ export default {
         { path: '/platform/home', label: '首页', module: 'home' },
         { path: '/platform/equipment/list', label: '查找设备', module: 'equipment' },
         { path: '/platform/user/reserve', label: '我的预约', module: 'equipment' },
-        { path: '/platform/equipment/reserve', label: '预约管理', module: 'reserve' },
+        { path: '/platform/equipment/reserve', label: '预约管理', module: 'reserve-admin' },
         { path: '/platform/user/borrow', label: '我的借用', module: 'borrow' },
         { path: '/platform/user/return', label: '我的归还', module: 'return' },
-        { path: '/platform/equipment/borrow', label: '借用管理', module: 'borrow' },
-        { path: '/platform/equipment/return', label: '归还管理', module: 'return' },
+        { path: '/platform/equipment/borrow', label: '借用管理', module: 'borrow-admin' },
+        { path: '/platform/equipment/return', label: '归还管理', module: 'return-admin' },
         { path: '/platform/user/repair', label: '我的报修', module: 'repair' },
-        { path: '/platform/equipment/repair', label: '报修管理', module: 'repair' },
+        { path: '/platform/equipment/repair', label: '报修管理', module: 'repair-admin' },
         { path: '/platform/profile/info', label: '个人信息', module: 'profile' },
         { path: '/platform/user/list', label: '用户管理', module: 'user' },
         { path: '/platform/user/register', label: '用户注册', module: 'user' },
@@ -258,7 +273,9 @@ export default {
       TurnOff,
       Link,
       Switch,
-      ArrowDown
+      ArrowDown,
+      Menu,
+      House
     }
   }
 }
