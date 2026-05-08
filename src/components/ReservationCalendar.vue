@@ -10,7 +10,8 @@ import dayGridPlugin from '@fullcalendar/daygrid'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import interactionPlugin from '@fullcalendar/interaction'
 import { getCalendarReservations } from '@/api/request'
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { websocketClient } from '@/utils/websocket'
 
 export default {
   name: 'ReservationCalendar',
@@ -46,6 +47,21 @@ export default {
           fetchEvents(formatDateForApi(start), formatDateForApi(end))
         }
       }, 100)
+      
+      websocketClient.on('reservation_refresh', handleWsMessage)
+    })
+    
+    const handleWsMessage = () => {
+      const calendarApi = calendarRef.value?.getApi()
+      if (calendarApi) {
+        const start = calendarApi.view.activeStart
+        const end = calendarApi.view.activeEnd
+        fetchEvents(formatDateForApi(start), formatDateForApi(end))
+      }
+    }
+    
+    onUnmounted(() => {
+      websocketClient.off('reservation_refresh', handleWsMessage)
     })
     
     const formatDateForApi = (date) => {

@@ -255,12 +255,11 @@
         <el-form-item label="设备状态" prop="equipmentStatus">
           <el-radio-group v-model="editForm.equipmentStatus">
             <el-radio :value="1">空闲</el-radio>
-            <el-radio :value="0">维修中</el-radio>
             <el-radio :value="4">故障</el-radio>
           </el-radio-group>
           <div class="form-tip">
             <el-icon><InfoFilled /></el-icon>
-            <span>其他状态（被预约、已借用）由系统自动计算</span>
+            <span>已借用状态由系统自动计算</span>
           </div>
         </el-form-item>
         <el-form-item label="设备位置" prop="equipmentLocation">
@@ -1109,7 +1108,7 @@ export default {
 
     const getStatusText = (equipmentStatus, stockQuantity, availableQuantity, borrowQuantity, reserveQuantity = 0) => {
       const manualStatusMap = {
-        0: '维修中',
+        0: '故障',
         4: '故障'
       }
       if (manualStatusMap[equipmentStatus]) {

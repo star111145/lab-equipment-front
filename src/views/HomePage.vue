@@ -419,6 +419,7 @@ export default {
 
     const handleWsMessage = () => {
       loadPendingActions()
+      loadLatestRecords()
     }
 
     onUnmounted(() => {

@@ -47,6 +47,7 @@
 
 <script>
 import { ref, onMounted, onUnmounted, nextTick } from 'vue'
+import { websocketClient } from '@/utils/websocket'
 import * as echarts from 'echarts'
 import router from '@/router'
 import service from '@/api/request'
@@ -215,13 +216,21 @@ export default {
       await loadEquipmentList()
       loadData()
       window.addEventListener('resize', handleResize)
+      
+      websocketClient.on('reservation_refresh', handleWsMessage)
     })
+
+    const handleWsMessage = () => {
+      loadData()
+    }
 
     onUnmounted(() => {
       if (chartInstance) {
         chartInstance.dispose()
       }
       window.removeEventListener('resize', handleResize)
+      
+      websocketClient.off('reservation_refresh', handleWsMessage)
     })
 
     return {

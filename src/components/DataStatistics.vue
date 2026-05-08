@@ -94,6 +94,7 @@
 
 <script>
 import { ref, onMounted, onUnmounted, nextTick } from 'vue'
+import { websocketClient } from '@/utils/websocket'
 import * as echarts from 'echarts'
 import { Box, Monitor, Calendar, Warning } from '@element-plus/icons-vue'
 import service from '@/api/request'
@@ -478,13 +479,30 @@ export default {
       loadUsageTrend()
       loadRepairStatistics()
       window.addEventListener('resize', handleResize)
+      
+      websocketClient.on('reservation_refresh', handleWsMessage)
+      websocketClient.on('borrow_refresh', handleWsMessage)
+      websocketClient.on('repair_refresh', handleWsMessage)
+      websocketClient.on('return_refresh', handleWsMessage)
     })
+
+    const handleWsMessage = () => {
+      loadStatistics()
+      loadEquipmentStatus()
+      loadUsageTrend()
+      loadRepairStatistics()
+    }
 
     onUnmounted(() => {
       if (equipmentStatusChartInstance) equipmentStatusChartInstance.dispose()
       if (usageTrendChartInstance) usageTrendChartInstance.dispose()
       if (repairStatisticsChartInstance) repairStatisticsChartInstance.dispose()
       window.removeEventListener('resize', handleResize)
+      
+      websocketClient.off('reservation_refresh', handleWsMessage)
+      websocketClient.off('borrow_refresh', handleWsMessage)
+      websocketClient.off('repair_refresh', handleWsMessage)
+      websocketClient.off('return_refresh', handleWsMessage)
     })
 
     return {
