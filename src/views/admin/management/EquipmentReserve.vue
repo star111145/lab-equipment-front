@@ -20,6 +20,18 @@
           <el-option label="已拒绝" :value="2" />
           <el-option label="已取消" :value="3" />
         </el-select>
+        <el-select
+          v-model="searchAuditStatus"
+          placeholder="审核状态"
+          clearable
+          style="width: 130px; margin-left: 10px;"
+          @change="getList"
+        >
+          <el-option label="全部" :value="-1" />
+          <el-option label="待审核" :value="0" />
+          <el-option label="已通过" :value="1" />
+          <el-option label="已拒绝" :value="2" />
+        </el-select>
         <el-input
           v-model="searchKeyword"
           placeholder="搜索设备编号/设备名称/预约人"
@@ -226,6 +238,7 @@ const currentPage = ref(1)
 const pageSize = ref(10)
 const total = ref(0)
 const searchStatus = ref(null)
+const searchAuditStatus = ref(null)
 const searchKeyword = ref('')
 const isAdmin = ref(localStorage.getItem('isAdministrator') === 'true')
 const route = useRoute()
@@ -296,7 +309,8 @@ const isAuditTimeout = (row) => {
 const getAuditStatusText = (status) => {
   const statusMap = {
     0: '待审核',
-    1: '已审核'
+    1: '已同意',
+    2: '已拒绝'
   }
   return statusMap[status] || '未知'
 }
@@ -304,7 +318,8 @@ const getAuditStatusText = (status) => {
 const getAuditStatusType = (status) => {
   const typeMap = {
     0: 'warning',
-    1: 'success'
+    1: 'success',
+    2: 'danger'
   }
   return typeMap[status] || 'info'
 }
@@ -317,6 +332,7 @@ const getList = async () => {
         current: currentPage.value,
         size: pageSize.value,
         status: searchStatus.value,
+        auditStatus: searchAuditStatus.value,
         keyword: searchKeyword.value
       }
     })

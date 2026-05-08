@@ -6,6 +6,7 @@
     </div>
     <div class="content">
       <LatestRecordsTicker :records="latestRecords" />
+      
       <div class="dashboard-actions">
         <el-card class="action-card">
           <template #header>
@@ -64,60 +65,7 @@
         </el-card>
       </div>
 
-      <el-card class="profile-card">
-        <div class="statistics-cards">
-        <el-card v-for="card in statsCards" :key="card.title" class="stat-card">
-          <div class="stat-card-content">
-            <div class="stat-card-icon" :class="`icon-${card.icon}`">
-              <el-icon :size="30"><component :is="card.icon" /></el-icon>
-            </div>
-            <div class="stat-card-info">
-              <div class="stat-card-value">{{ card.value }}</div>
-              <div class="stat-card-label">{{ card.label }}</div>
-            </div>
-          </div>
-        </el-card>
-      </div>
-
-      <div class="charts-container">
-        <el-card class="chart-card">
-          <template #header>
-            <div class="card-header">
-              <span>设备状态分布</span>
-            </div>
-          </template>
-          <div ref="equipmentStatusChart" class="chart" style="height: 300px;"></div>
-        </el-card>
-
-        <el-card class="chart-card">
-          <template #header>
-            <div class="card-header">
-              <span>设备使用趋势（周）</span>
-            </div>
-          </template>
-          <div ref="usageTrendChart" class="chart" style="height: 300px;"></div>
-        </el-card>
-      </div>
-
-      <div class="charts-container">
-        <el-card class="chart-card">
-          <template #header>
-            <div class="card-header">
-              <span>预约热度排行</span>
-            </div>
-          </template>
-          <div ref="reservationHotspotChart" class="chart" style="height: 300px;"></div>
-        </el-card>
-
-        <el-card class="chart-card">
-          <template #header>
-            <div class="card-header">
-              <span>报修统计</span>
-            </div>
-          </template>
-          <div ref="repairStatisticsChart" class="chart" style="height: 300px;"></div>
-        </el-card>
-      </div>
+      <ReservationHotspot :equipment-type-list="equipmentTypeList" />
 
       <el-card class="calendar-card">
         <template #header>
@@ -125,11 +73,11 @@
             <span>设备预约日历</span>
             <el-select 
               v-model="selectedEquipmentType" 
-              placeholder="设备类型" 
+              placeholder="设备类型"
               style="width: 140px; margin-left: 20px;"
               @change="handleEquipmentTypeChange"
-              clearable
             >
+              <el-option label="全部" value="" />
               <el-option
                 v-for="item in equipmentTypeList"
                 :key="item"
@@ -198,30 +146,28 @@
           请先选择设备查看预约日历
         </div>
       </el-card>
-      </el-card>
+
+      <DataStatistics :equipment-type-list="equipmentTypeList" :is-admin="isAdmin" :user-id="userId" />
     </div>
   </div>
 </template>
 
 <script>
-import { ref, onMounted, onUnmounted, nextTick, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { ElMessage } from 'element-plus'
-import * as echarts from 'echarts'
 import router from '@/router'
 import { 
   Box, 
   Monitor, 
   Calendar, 
-  Warning,
-  Download,
-  Setting,
-  User,
-  Folder
+  Warning
 } from '@element-plus/icons-vue'
 import service, { getEquipmentList, getEquipmentTypes } from '@/api/request'
 import ReservationCalendar from '@/components/ReservationCalendar.vue'
 import NoticeDisplay from '@/components/NoticeDisplay.vue'
 import LatestRecordsTicker from '@/components/LatestRecordsTicker.vue'
+import ReservationHotspot from '@/components/ReservationHotspot.vue'
+import DataStatistics from '@/components/DataStatistics.vue'
 import { websocketClient } from '@/utils/websocket'
 
 export default {
@@ -231,35 +177,18 @@ export default {
     Monitor,
     Calendar,
     Warning,
-    Download,
-    Setting,
-    User,
-    Folder,
     ReservationCalendar,
     NoticeDisplay,
-    LatestRecordsTicker
+    LatestRecordsTicker,
+    ReservationHotspot,
+    DataStatistics
   },
   setup() {
-    const statsCards = ref([
-      { title: '设备总数', value: 0, label: '台', icon: 'Monitor' },
-      { title: '可用设备', value: 0, label: '台', icon: 'Box' },
-      { title: '预约申请', value: 0, label: '条', icon: 'Calendar' },
-      { title: '报修处理', value: 0, label: '条', icon: 'Warning' }
-    ])
-
-    const equipmentStatusChart = ref(null)
-    const usageTrendChart = ref(null)
-    const reservationHotspotChart = ref(null)
-    const repairStatisticsChart = ref(null)
-    let equipmentStatusChartInstance = null
-    let usageTrendChartInstance = null
-    let reservationHotspotChartInstance = null
-    let repairStatisticsChartInstance = null
-    
     const pendingActions = ref([])
     const latestRecords = ref([])
     const pendingActionType = ref('')
     const isAdmin = ref(false)
+    const userId = ref(null)
     
     const selectedEquipmentId = ref(null)
     const equipmentList = ref([])
@@ -371,58 +300,6 @@ export default {
       }
     }
 
-    const loadDashboardData = async () => {
-      const token = localStorage.getItem('token')
-      if (!token) {
-        return
-      }
-      
-      try {
-        const res = await service.get('/dashboard/statistics')
-        if (res.code === 200) {
-          const data = res.data
-          statsCards.value[0].value = data.totalEquipment || 0
-          statsCards.value[1].value = data.availableEquipment || 0
-          statsCards.value[2].value = data.totalReservation || 0
-          statsCards.value[3].value = data.totalRepair || 0
-        }
-      } catch (error) {
-        console.error('加载统计信息失败:', error)
-      }
-    }
-
-    const loadEquipmentStatus = async () => {
-      const token = localStorage.getItem('token')
-      if (!token) {
-        return
-      }
-      
-      try {
-        const res = await service.get('/dashboard/equipment-status')
-        if (res.code === 200) {
-          renderEquipmentStatusChart(res.data)
-        }
-      } catch (error) {
-        console.error('加载设备状态数据失败:', error)
-      }
-    }
-
-    const loadUsageTrend = async () => {
-      const token = localStorage.getItem('token')
-      if (!token) {
-        return
-      }
-      
-      try {
-        const res = await service.get('/dashboard/usage-trend?period=week')
-        if (res.code === 200) {
-          renderUsageTrendChart(res.data)
-        }
-      } catch (error) {
-        console.error('加载使用趋势数据失败:', error)
-      }
-    }
-
     const loadPendingActions = async () => {
       const token = localStorage.getItem('token')
       if (!token) {
@@ -445,7 +322,12 @@ export default {
         console.error('加载待办事项失败:', error)
       }
     }
-    
+
+    const handlePendingActionTypeChange = (value) => {
+      pendingActionType.value = value
+      loadPendingActions()
+    }
+
     const loadLatestRecords = async () => {
       const token = localStorage.getItem('token')
       if (!token) {
@@ -459,38 +341,6 @@ export default {
         }
       } catch (error) {
         console.error('加载最新动态失败:', error)
-      }
-    }
-    
-    const loadReservationHotspots = async () => {
-      const token = localStorage.getItem('token')
-      if (!token) {
-        return
-      }
-      
-      try {
-        const res = await service.get('/dashboard/reservation-hotspots?limit=10')
-        if (res.code === 200) {
-          renderReservationHotspotChart(res.data)
-        }
-      } catch (error) {
-        console.error('加载预约热度数据失败:', error)
-      }
-    }
-    
-    const loadRepairStatistics = async () => {
-      const token = localStorage.getItem('token')
-      if (!token) {
-        return
-      }
-      
-      try {
-        const res = await service.get('/dashboard/repair-statistics')
-        if (res.code === 200) {
-          renderRepairStatisticsChart(res.data)
-        }
-      } catch (error) {
-        console.error('加载报修统计数据失败:', error)
       }
     }
     
@@ -509,273 +359,6 @@ export default {
         router.push({ path: '/platform/equipment/reserve', query: { id: eventData.id } })
       } else {
         router.push({ path: '/platform/user/reserve', query: { id: eventData.id } })
-      }
-    }
-    
-    const handlePendingActionTypeChange = (value) => {
-      pendingActionType.value = value
-      loadPendingActions()
-    }
-
-    const renderEquipmentStatusChart = (data) => {
-      if (!equipmentStatusChart.value) return
-      
-      nextTick(() => {
-        if (equipmentStatusChartInstance) {
-          equipmentStatusChartInstance.dispose()
-        }
-        
-        equipmentStatusChartInstance = echarts.init(equipmentStatusChart.value)
-        
-        const option = {
-          title: {
-            text: '设备状态分布',
-            left: 'center',
-            top: '5%'
-          },
-          tooltip: {
-            trigger: 'item',
-            formatter: '{a} <br/>{b}: {c} ({d}%)'
-          },
-          legend: {
-            bottom: '5%',
-            left: 'center'
-          },
-          series: [
-            {
-              name: '设备状态',
-              type: 'pie',
-              radius: ['40%', '70%'],
-              avoidLabelOverlap: false,
-              itemStyle: {
-                borderRadius: 10,
-                borderColor: '#fff',
-                borderWidth: 2
-              },
-              label: {
-                show: false
-              },
-              emphasis: {
-                label: {
-                  show: true,
-                  fontSize: 16,
-                  fontWeight: 'bold'
-                }
-              },
-              labelLine: {
-                show: false
-              },
-              data: data.map(item => ({
-                value: item.count,
-                name: item.statusText
-              }))
-            }
-          ]
-        }
-        
-        equipmentStatusChartInstance.setOption(option)
-      })
-    }
-
-    const renderUsageTrendChart = (data) => {
-      if (!usageTrendChart.value) return
-      
-      nextTick(() => {
-        if (usageTrendChartInstance) {
-          usageTrendChartInstance.dispose()
-        }
-        
-        usageTrendChartInstance = echarts.init(usageTrendChart.value)
-        
-        const dates = data.map(item => item.date)
-        const counts = data.map(item => item.count)
-        
-        const option = {
-          title: {
-            text: '设备使用趋势',
-            left: 'center',
-            top: '5%'
-          },
-          tooltip: {
-            trigger: 'axis'
-          },
-          legend: {
-            data: ['使用次数'],
-            bottom: '5%'
-          },
-          grid: {
-            left: '3%',
-            right: '4%',
-            bottom: '15%',
-            top: '15%',
-            containLabel: true
-          },
-          xAxis: {
-            type: 'category',
-            boundaryGap: false,
-            data: dates
-          },
-          yAxis: {
-            type: 'value',
-            name: '次数'
-          },
-          series: [
-            {
-              name: '使用次数',
-              type: 'line',
-              smooth: true,
-              data: counts,
-              itemStyle: {
-                color: '#409eff'
-              },
-              lineStyle: {
-                width: 3
-              },
-              areaStyle: {
-                color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                  { offset: 0, color: 'rgba(64, 158, 255, 0.3)' },
-                  { offset: 1, color: 'rgba(64, 158, 255, 0.1)' }
-                ])
-              }
-            }
-          ]
-        }
-        
-        usageTrendChartInstance.setOption(option)
-      })
-    }
-
-    const renderReservationHotspotChart = (data) => {
-      if (!reservationHotspotChart.value) return
-      
-      nextTick(() => {
-        if (reservationHotspotChartInstance) {
-          reservationHotspotChartInstance.dispose()
-        }
-        
-        reservationHotspotChartInstance = echarts.init(reservationHotspotChart.value)
-        
-        const names = data.map(item => item.equipmentName).reverse()
-        const counts = data.map(item => item.reservationCount).reverse()
-        
-        const option = {
-          title: {
-            text: '预约热度TOP10',
-            left: 'center',
-            top: '5%'
-          },
-          tooltip: {
-            trigger: 'axis',
-            axisPointer: {
-              type: 'shadow'
-            }
-          },
-          grid: {
-            left: '3%',
-            right: '4%',
-            bottom: '15%',
-            top: '15%',
-            containLabel: true
-          },
-          xAxis: {
-            type: 'value',
-            name: '预约次数'
-          },
-          yAxis: {
-            type: 'category',
-            data: names
-          },
-          series: [
-            {
-              name: '预约次数',
-              type: 'bar',
-              data: counts,
-              itemStyle: {
-                color: '#409eff'
-              },
-              label: {
-                show: true,
-                position: 'right'
-              }
-            }
-          ]
-        }
-        
-        reservationHotspotChartInstance.setOption(option)
-      })
-    }
-
-    const renderRepairStatisticsChart = (data) => {
-      if (!repairStatisticsChart.value) return
-      
-      nextTick(() => {
-        if (repairStatisticsChartInstance) {
-          repairStatisticsChartInstance.dispose()
-        }
-        
-        repairStatisticsChartInstance = echarts.init(repairStatisticsChart.value)
-        
-        const option = {
-          title: {
-            text: '报修状态分布',
-            left: 'center',
-            top: '5%'
-          },
-          tooltip: {
-            trigger: 'item',
-            formatter: '{b}: {c} ({d}%)'
-          },
-          legend: {
-            orient: 'vertical',
-            right: '5%',
-            top: 'center',
-            data: ['待审核', '维修中', '已维修', '已拒绝']
-          },
-          series: [
-            {
-              name: '报修状态',
-              type: 'pie',
-              radius: ['40%', '70%'],
-              center: ['40%', '50%'],
-              avoidLabelOverlap: false,
-              label: {
-                show: true,
-                formatter: '{b}: {c}'
-              },
-              data: [
-                { value: data.pendingRepairs || 0, name: '待审核', itemStyle: { color: '#E6A23C' } },
-                { value: data.inProgressRepairs || 0, name: '维修中', itemStyle: { color: '#F56C6C' } },
-                { value: data.completedRepairs || 0, name: '已维修', itemStyle: { color: '#67C23A' } },
-                { value: data.rejectedRepairs || 0, name: '已拒绝', itemStyle: { color: '#909399' } }
-              ]
-            }
-          ]
-        }
-        
-        if (data.averageProcessingTime) {
-          option.title.subtext = `平均处理时长: ${data.averageProcessingTime}小时`
-          option.title.subtextStyle = {
-            fontSize: 12,
-            color: '#666'
-          }
-        }
-        
-        repairStatisticsChartInstance.setOption(option)
-      })
-    }
-
-    const resizeCharts = () => {
-      if (equipmentStatusChartInstance) {
-        equipmentStatusChartInstance.resize()
-      }
-      if (usageTrendChartInstance) {
-        usageTrendChartInstance.resize()
-      }
-      if (reservationHotspotChartInstance) {
-        reservationHotspotChartInstance.resize()
-      }
-      if (repairStatisticsChartInstance) {
-        repairStatisticsChartInstance.resize()
       }
     }
 
@@ -819,15 +402,14 @@ export default {
     }
 
     onMounted(() => {
-      loadDashboardData()
-      loadEquipmentStatus()
-      loadUsageTrend()
+      const role = localStorage.getItem('role') || ''
+      const storedUserId = localStorage.getItem('userId') ? parseInt(localStorage.getItem('userId')) : null
+      isAdmin.value = role === 'admin'
+      userId.value = storedUserId
+      
       loadPendingActions()
       loadLatestRecords()
-      loadReservationHotspots()
-      loadRepairStatistics()
       loadEquipmentList()
-      window.addEventListener('resize', resizeCharts)
       
       websocketClient.on('reservation_refresh', handleWsMessage)
       websocketClient.on('borrow_refresh', handleWsMessage)
@@ -840,20 +422,6 @@ export default {
     }
 
     onUnmounted(() => {
-      if (equipmentStatusChartInstance) {
-        equipmentStatusChartInstance.dispose()
-      }
-      if (usageTrendChartInstance) {
-        usageTrendChartInstance.dispose()
-      }
-      if (reservationHotspotChartInstance) {
-        reservationHotspotChartInstance.dispose()
-      }
-      if (repairStatisticsChartInstance) {
-        repairStatisticsChartInstance.dispose()
-      }
-      window.removeEventListener('resize', resizeCharts)
-      
       websocketClient.off('reservation_refresh', handleWsMessage)
       websocketClient.off('borrow_refresh', handleWsMessage)
       websocketClient.off('repair_refresh', handleWsMessage)
@@ -861,17 +429,13 @@ export default {
     })
 
     return {
-      statsCards,
-      equipmentStatusChart,
-      usageTrendChart,
-      reservationHotspotChart,
-      repairStatisticsChart,
       latestRecords,
       pendingActions,
       pendingActionType,
       handlePendingActionTypeChange,
       handleCalendarEventClick,
       isAdmin,
+      userId,
       selectedEquipmentId,
       equipmentList,
       equipmentTypeList,
@@ -918,86 +482,6 @@ export default {
   min-height: 400px;
 }
 
-.statistics-cards {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 20px;
-  margin-bottom: 30px;
-}
-
-.stat-card {
-  cursor: pointer;
-  transition: all 0.3s;
-}
-
-.stat-card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-}
-
-.stat-card-content {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.stat-card-icon {
-  width: 60px;
-  height: 60px;
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(135deg, #66bb6a 0%, #43a047 100%);
-}
-
-.stat-card-icon.icon-Monitor {
-  background: linear-gradient(135deg, #42a5f5 0%, #1e88e5 100%);
-}
-
-.stat-card-icon.icon-Box {
-  background: linear-gradient(135deg, #66bb6a 0%, #43a047 100%);
-}
-
-.stat-card-icon.icon-Calendar {
-  background: linear-gradient(135deg, #ffa726 0%, #ff9800 100%);
-}
-
-.stat-card-icon.icon-Warning {
-  background: linear-gradient(135deg, #ef5350 0%, #e53935 100%);
-}
-
-.stat-card-info {
-  text-align: right;
-}
-
-.stat-card-value {
-  font-size: 24px;
-  font-weight: bold;
-  color: #303133;
-  margin-bottom: 5px;
-}
-
-.stat-card-label {
-  font-size: 14px;
-  color: #909399;
-}
-
-.charts-container {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 20px;
-}
-
-.chart-card {
-  margin-bottom: 20px;
-}
-
-.chart-card :deep(.el-card__header) {
-  padding: 15px 20px;
-  border-bottom: 1px solid #ebeef5;
-}
-
 .calendar-card {
   margin-bottom: 20px;
 }
@@ -1012,6 +496,17 @@ export default {
   color: #303133;
   display: flex;
   align-items: center;
+}
+
+.chart {
+  width: 100%;
+}
+
+.profile-card {
+  border: none;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  border-radius: 8px;
+  padding: 20px;
 }
 
 .chart {
@@ -1091,6 +586,32 @@ export default {
   padding: 20px;
 }
 
+.filter-card {
+  margin-bottom: 20px;
+}
+
+.filter-card :deep(.el-card__header) {
+  padding: 15px 20px;
+  border-bottom: 1px solid #ebeef5;
+}
+
+.filter-content {
+  display: flex;
+  align-items: center;
+  padding: 10px 0;
+}
+
+.chart {
+  width: 100%;
+  min-height: 300px;
+  height: 300px;
+}
+
+.chart :deep(canvas) {
+  max-width: 100%;
+  height: auto !important;
+}
+
 @media (max-width: 768px) {
   .platform-home {
     padding: 15px;
@@ -1119,5 +640,179 @@ export default {
   .dashboard-actions {
     grid-template-columns: 1fr;
   }
+}
+
+.hotspot-card {
+  margin-bottom: 20px;
+}
+
+.hotspot-card :deep(.el-card__header) {
+  padding: 15px 20px;
+  border-bottom: 1px solid #ebeef5;
+}
+
+.hotspot-chart {
+  width: 100%;
+  height: 300px;
+}
+
+.statistics-card {
+  margin-bottom: 20px;
+}
+
+.statistics-card :deep(.el-card__header) {
+  padding: 15px 20px;
+  border-bottom: 1px solid #ebeef5;
+}
+
+.statistics-card .card-header {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.header-filter {
+  display: flex;
+  align-items: center;
+  margin-left: auto;
+}
+
+.statistics-section {
+  padding-bottom: 20px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid #ebeef5;
+}
+
+.statistics-section:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.section-title {
+  font-size: 15px;
+  font-weight: 500;
+  color: #303133;
+  margin-bottom: 15px;
+  padding-left: 10px;
+  border-left: 3px solid #409eff;
+}
+
+.chart-wrapper {
+  padding: 10px 0;
+}
+
+.statistics-cards {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 15px;
+  margin-bottom: 25px;
+}
+
+.stat-card {
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.stat-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.stat-card :deep(.el-card__body) {
+  padding: 15px;
+}
+
+.stat-card-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.stat-card-icon {
+  width: 50px;
+  height: 50px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #66bb6a 0%, #43a047 100%);
+}
+
+.stat-card-icon.icon-Monitor {
+  background: linear-gradient(135deg, #42a5f5 0%, #1e88e5 100%);
+}
+
+.stat-card-icon.icon-Box {
+  background: linear-gradient(135deg, #66bb6a 0%, #43a047 100%);
+}
+
+.stat-card-icon.icon-Calendar {
+  background: linear-gradient(135deg, #ffa726 0%, #ff9800 100%);
+}
+
+.stat-card-icon.icon-Warning {
+  background: linear-gradient(135deg, #ef5350 0%, #e53935 100%);
+}
+
+.stat-card-info {
+  text-align: right;
+}
+
+.stat-card-value {
+  font-size: 22px;
+  font-weight: bold;
+  color: #303133;
+  margin-bottom: 3px;
+}
+
+.stat-card-label {
+  font-size: 13px;
+  color: #909399;
+}
+
+.statistics-charts {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+}
+
+.statistics-charts .chart-item {
+  min-height: 280px;
+}
+
+.chart-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: #606266;
+  margin-bottom: 10px;
+  text-align: center;
+}
+
+.chart {
+  width: 100%;
+  min-height: 250px;
+  height: 250px;
+}
+
+.chart :deep(canvas) {
+  max-width: 100%;
+  height: auto !important;
+}
+
+.filter-card {
+  margin-bottom: 20px;
+}
+
+.filter-card :deep(.el-card__header) {
+  padding: 15px 20px;
+  border-bottom: 1px solid #ebeef5;
+}
+
+.filter-content {
+  display: flex;
+  align-items: center;
+  padding: 10px 0;
 }
 </style>

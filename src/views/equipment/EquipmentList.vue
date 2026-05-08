@@ -540,7 +540,7 @@
 
 <script>
 import { ref, reactive, onMounted, onUnmounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import service from '@/api/request'
 import { websocketClient } from '@/utils/websocket'
@@ -573,6 +573,7 @@ export default {
     const repairFileList = ref([])
     const defaultImage = require('@/assets/default_equipment.png')
     const router = useRouter()
+    const route = useRoute()
 
     const editForm = reactive({
       id: null,
@@ -1179,6 +1180,16 @@ export default {
       websocketClient.on('borrow_refresh', handleWsMessage)
       websocketClient.on('repair_refresh', handleWsMessage)
       websocketClient.on('return_refresh', handleWsMessage)
+      
+      const equipmentId = route.query.id
+      const action = route.query.action
+      if (equipmentId && action === 'reserve') {
+        const equipment = equipmentList.value.find(item => item.id === parseInt(equipmentId))
+        if (equipment) {
+          handleReserve(equipment)
+        }
+        router.replace({ query: {} })
+      }
     })
 
     const handleWsMessage = () => {
