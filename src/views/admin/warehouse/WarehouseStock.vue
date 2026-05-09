@@ -69,6 +69,7 @@
             </el-tag>
           </template>
         </el-table-column>
+        <el-table-column prop="stockQuantity" label="库存" width="80" align="center" />
         <el-table-column prop="operatorName" label="操作人" width="100" />
         <el-table-column prop="remark" label="备注" min-width="200" />
         <el-table-column prop="createTime" label="操作时间" width="180">

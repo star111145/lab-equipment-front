@@ -46,6 +46,9 @@
         <el-button type="primary" @click="showExportDialog = true; exportAll = false">
           统计报表
         </el-button>
+        <el-button type="success" @click="handleAdd">
+          <el-icon><Plus /></el-icon>添加设备
+        </el-button>
         <el-button type="danger" @click="handleBatchDelete" :disabled="selectedRowIds.size === 0">
           批量删除 ({{ selectedRowIds.size }})
         </el-button>
@@ -109,6 +112,13 @@
         </el-table-column>
         <el-table-column prop="availableQuantity" label="可用数量" width="100" />
         <el-table-column prop="stockQuantity" label="库存数量" width="100" />
+        <el-table-column label="上架状态" width="100">
+          <template #default="{ row }">
+            <el-tag :type="row.isListed ? 'success' : 'danger'" disable-transitions>
+              {{ row.isListed ? '上架' : '下架' }}
+            </el-tag>
+          </template>
+        </el-table-column>
         <el-table-column label="故障数量" width="100">
           <template #default="{ row }">
             <el-tag :type="row.unavailableQuantity > 0 ? 'danger' : 'info'" disable-transitions>
@@ -251,8 +261,15 @@
         <el-form-item label="设备型号">
           <el-input v-model="editForm.equipmentModel" placeholder="请输入设备型号" maxlength="100" />
         </el-form-item>
-        <el-form-item label="设备类型" prop="equipmentType">
-          <el-input v-model="editForm.equipmentType" />
+        <el-form-item label="设备类型" prop="equipmentTypeId">
+          <el-select v-model="editForm.equipmentTypeId" placeholder="请选择设备类型" style="width: 100%">
+            <el-option
+              v-for="type in equipmentTypeListWithId"
+              :key="type.id"
+              :label="type.typeName"
+              :value="type.id"
+            />
+          </el-select>
         </el-form-item>
         <el-form-item label="设备状态" prop="equipmentStatus">
           <el-radio-group v-model="editForm.equipmentStatus">
@@ -264,8 +281,25 @@
             <span>已借用状态由系统自动计算</span>
           </div>
         </el-form-item>
-        <el-form-item label="设备位置" prop="equipmentLocation">
-          <el-input v-model="editForm.equipmentLocation" />
+        <el-form-item label="仓库">
+          <el-select v-model="editForm.warehouseId" placeholder="请选择仓库" clearable style="width: 100%">
+            <el-option
+              v-for="warehouse in warehouseList"
+              :key="warehouse.id"
+              :label="warehouse.warehouseName"
+              :value="warehouse.id"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="供应商">
+          <el-select v-model="editForm.supplierId" placeholder="请选择供应商" clearable style="width: 100%">
+            <el-option
+              v-for="supplier in supplierList"
+              :key="supplier.id"
+              :label="supplier.supplierName"
+              :value="supplier.id"
+            />
+          </el-select>
         </el-form-item>
         <el-form-item label="库存数量" prop="stockQuantity">
           <NumberInput
@@ -328,6 +362,129 @@
       <template #footer>
         <el-button @click="showEditDialog = false">取消</el-button>
         <el-button type="primary" @click="handleEditSubmit">确定</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog
+      v-model="showAddDialog"
+      title="添加设备"
+      width="600px"
+    >
+      <el-form
+        ref="addFormRef"
+        :model="addForm"
+        :rules="addRules"
+        label-width="100px"
+      >
+        <el-form-item label="设备编号" prop="equipmentNumber">
+          <el-input v-model="addForm.equipmentNumber" placeholder="请输入数字编号" maxlength="10" @input="handleNumberInput">
+            <template #prefix>
+              <span style="color: #409eff; font-weight: bold;">EQ</span>
+            </template>
+          </el-input>
+        </el-form-item>
+        <el-form-item label="设备名称" prop="equipmentName">
+          <el-input v-model="addForm.equipmentName" placeholder="请输入设备名称" maxlength="50" />
+        </el-form-item>
+        <el-form-item label="设备型号">
+          <el-input v-model="addForm.equipmentModel" placeholder="请输入设备型号" maxlength="100" />
+        </el-form-item>
+        <el-form-item label="设备类型" prop="equipmentTypeId">
+          <el-select v-model="addForm.equipmentTypeId" placeholder="请选择设备类型" style="width: 100%">
+            <el-option
+              v-for="type in equipmentTypeListWithId"
+              :key="type.id"
+              :label="type.typeName"
+              :value="type.id"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="仓库">
+          <el-select v-model="addForm.warehouseId" placeholder="请选择仓库" clearable style="width: 100%">
+            <el-option
+              v-for="warehouse in warehouseList"
+              :key="warehouse.id"
+              :label="warehouse.warehouseName"
+              :value="warehouse.id"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="供应商">
+          <el-select v-model="addForm.supplierId" placeholder="请选择供应商" clearable style="width: 100%">
+            <el-option
+              v-for="supplier in supplierList"
+              :key="supplier.id"
+              :label="supplier.supplierName"
+              :value="supplier.id"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="初始库存" prop="stockQuantity">
+          <NumberInput
+            v-model="addForm.stockQuantity"
+            :min="0"
+            :max="10000"
+          />
+          <div class="form-tip">
+            <el-icon><InfoFilled /></el-icon>
+            <span>添加设备后将自动创建入库记录</span>
+          </div>
+        </el-form-item>
+        <el-form-item label="设备图片">
+          <div class="avatar-upload-container">
+            <div class="avatar-preview-box">
+              <el-avatar
+                v-if="addForm.equipmentImage && addForm.equipmentImage !== ''"
+                :src="addForm.equipmentImage"
+                size="large"
+                shape="square"
+                class="equipment-avatar"
+                @error="handleAddImageError"
+              />
+              <el-avatar
+                v-else
+                size="large"
+                shape="square"
+                :src="defaultImage"
+                class="equipment-avatar"
+              />
+            </div>
+            <div class="avatar-actions">
+              <div class="upload-hint">
+                <el-icon><InfoFilled /></el-icon>
+                <span>支持上传 PNG、JPG、JPEG、WEBP 格式图片</span>
+              </div>
+              <el-upload
+                v-model:file-list="addFileList"
+                :auto-upload="false"
+                :show-file-list="false"
+                :on-change="handleAddFileChange"
+                accept="image/png, image/jpeg, image/jpg, image/webp"
+                :limit="1"
+                class="upload-btn"
+              >
+                <el-button type="primary" size="small">
+                  <el-icon><Upload /></el-icon>选择图片
+                </el-button>
+              </el-upload>
+              <el-button
+                v-if="addForm.equipmentImage && addForm.equipmentImage !== ''"
+                type="danger"
+                size="small"
+                @click="clearAddImage"
+              >
+                清除
+              </el-button>
+            </div>
+          </div>
+        </el-form-item>
+        <el-form-item label="设备描述">
+          <el-input v-model="addForm.description" type="textarea" :rows="3" placeholder="请输入设备描述" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showAddDialog = false">取消</el-button>
+        <el-button type="primary" @click="handleAddSubmit">确定</el-button>
       </template>
     </el-dialog>
 
@@ -586,7 +743,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import service from '@/api/request'
 import { websocketClient } from '@/utils/websocket'
-import { Search, UploadFilled, InfoFilled } from '@element-plus/icons-vue'
+import { Search, Upload, UploadFilled, InfoFilled, Plus } from '@element-plus/icons-vue'
 import NumberInput from '@/components/NumberInput.vue'
 
 const QR_BASE_URL = 'http://10.29.80.192:8090'
@@ -601,8 +758,10 @@ export default {
     const searchText = ref('')
     const searchType = ref('')
     const equipmentTypeList = ref([])
+    const equipmentTypeListWithId = ref([])
     const showEditDialog = ref(false)
     const showViewDialog = ref(false)
+    const showAddDialog = ref(false)
     const showBorrowDialog = ref(false)
     const showReserveDialog = ref(false)
     const showRepairDialog = ref(false)
@@ -620,6 +779,9 @@ export default {
     const selectedRowIds = ref(new Set())
     const fileList = ref([])
     const repairFileList = ref([])
+    const addFileList = ref([])
+    const warehouseList = ref([])
+    const supplierList = ref([])
     const defaultImage = require('@/assets/default_equipment.png')
     const router = useRouter()
     const route = useRoute()
@@ -633,12 +795,28 @@ export default {
       equipmentTypeId: null,
       equipmentStatus: 1,
       equipmentLocation: '',
+      warehouseId: null,
       stockQuantity: 0,
       description: '',
       supplier: '',
+      supplierId: null,
       equipmentImage: '',
       qrcodeUrl: ''
     })
+
+    const addForm = reactive({
+      equipmentNumber: '',
+      equipmentName: '',
+      equipmentModel: '',
+      equipmentTypeId: null,
+      warehouseId: null,
+      supplierId: null,
+      stockQuantity: 0,
+      equipmentImage: '',
+      description: ''
+    })
+
+    const addFormRef = ref(null)
 
     const viewForm = reactive({
       equipmentNumber: '',
@@ -715,6 +893,19 @@ export default {
       ]
     })
 
+    const addRules = reactive({
+      equipmentNumber: [
+        { required: true, message: '请输入设备编号', trigger: 'blur' },
+        { pattern: /^\d+$/, message: '设备编号必须为数字', trigger: 'blur' }
+      ],
+      equipmentName: [
+        { required: true, message: '请输入设备名称', trigger: 'blur' }
+      ],
+      equipmentTypeId: [
+        { required: true, message: '请选择设备类型', trigger: 'change' }
+      ]
+    })
+
     const repairRules = reactive({
       repairQuantity: [
         { required: true, message: '请输入报修数量', trigger: 'blur' },
@@ -769,14 +960,101 @@ export default {
         editForm.equipmentTypeId = res.data.equipmentTypeId
         editForm.equipmentStatus = res.data.equipmentStatus
         editForm.equipmentLocation = res.data.equipmentLocation
+        editForm.warehouseId = res.data.warehouseId
         editForm.stockQuantity = res.data.stockQuantity
         editForm.description = res.data.description
         editForm.supplier = res.data.supplier || ''
+        editForm.supplierId = res.data.supplierId
         editForm.equipmentImage = res.data.equipmentImage || ''
         editForm.qrcodeUrl = res.data.qrcodeUrl || ''
+        getWarehouseList()
+        getSupplierList()
+        equipmentTypeListWithId.value = await getEquipmentTypeListWithId()
         showEditDialog.value = true
       } catch (err) {
         console.error('获取设备详情失败:', err)
+      }
+    }
+
+    const handleAdd = async () => {
+      addForm.equipmentNumber = ''
+      addForm.equipmentName = ''
+      addForm.equipmentModel = ''
+      addForm.equipmentTypeId = null
+      addForm.warehouseId = null
+      addForm.supplierId = null
+      addForm.stockQuantity = 0
+      addForm.equipmentImage = ''
+      addForm.description = ''
+      addFileList.value = []
+      showAddDialog.value = true
+      getWarehouseList()
+      getSupplierList()
+      equipmentTypeListWithId.value = await getEquipmentTypeListWithId()
+    }
+
+    const handleNumberInput = (value) => {
+      addForm.equipmentNumber = value.replace(/\D/g, '')
+    }
+
+    const handleAddSubmit = async () => {
+      try {
+        await addFormRef.value.validate()
+        const res = await service.post('/equipment', addForm)
+        if (res.code === 200) {
+          ElMessage.success('添加设备成功')
+          showAddDialog.value = false
+          getEquipmentList()
+        } else {
+          ElMessage.error(res.msg || '添加设备失败')
+        }
+      } catch (err) {
+        console.error('添加设备失败:', err)
+        ElMessage.error('添加设备失败')
+      }
+    }
+
+    const handleAddFileChange = async (file) => {
+      if (!file.raw) return
+      const formData = new FormData()
+      formData.append('file', file.raw)
+      try {
+        const res = await service.post('/equipment/upload-image', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        })
+        addForm.equipmentImage = res.data
+        ElMessage.success('图片上传成功')
+        addFileList.value = []
+      } catch (err) {
+        console.error('图片上传失败:', err)
+        ElMessage.error('图片上传失败')
+      }
+    }
+
+    const handleAddImageError = () => {
+      addForm.equipmentImage = ''
+    }
+
+    const clearAddImage = () => {
+      addForm.equipmentImage = ''
+      addFileList.value = []
+    }
+
+    const getWarehouseList = async () => {
+      try {
+        const res = await service.get('/warehouse/all')
+        warehouseList.value = res.data || []
+      } catch (err) {
+        console.error('获取仓库列表失败:', err)
+      }
+    }
+
+    const getSupplierList = async () => {
+      try {
+        const res = await service.get('/supplier/all')
+        supplierList.value = res.data || []
+      } catch (err) {
+        console.error('获取供应商列表失败:', err)
       }
     }
 
@@ -1371,13 +1649,25 @@ export default {
       }
     }
 
+    const getEquipmentTypeListWithId = async () => {
+      try {
+        const res = await service.get('/equipment-type/all')
+        return res.data || []
+      } catch (err) {
+        console.error('获取设备类型列表失败:', err)
+        return []
+      }
+    }
+
     return {
       loading,
       searchText,
       searchType,
       equipmentTypeList,
+      equipmentTypeListWithId,
       showEditDialog,
       showViewDialog,
+      showAddDialog,
       showBorrowDialog,
       showReserveDialog,
       showRepairDialog,
@@ -1388,13 +1678,16 @@ export default {
       equipmentList,
       editFormRef,
       repairFormRef,
+      addFormRef,
       editForm,
+      addForm,
       viewForm,
       borrowForm,
       reserveForm,
       repairForm,
       pagination,
       editRules,
+      addRules,
       repairRules,
       isAdmin,
       showManagement,
@@ -1402,7 +1695,14 @@ export default {
       selectedRowIds,
       getEquipmentList,
       getEquipmentTypeList,
+      getEquipmentTypeListWithId,
       handleEdit,
+      handleAdd,
+      handleNumberInput,
+      handleAddSubmit,
+      handleAddFileChange,
+      handleAddImageError,
+      clearAddImage,
       handleEditSubmit,
       handleView,
       handleBorrow,
@@ -1436,11 +1736,16 @@ export default {
       handleSizeChange,
       handleCurrentChange,
       Search,
+      Upload,
       UploadFilled,
       InfoFilled,
+      Plus,
       defaultImage,
       fileList,
-      repairFileList
+      repairFileList,
+      addFileList,
+      warehouseList,
+      supplierList
     }
   }
 }
