@@ -52,10 +52,7 @@
       </div>
 
       <div v-if="showManagement" class="management-bar">
-        <el-button type="success">
-          导出Excel
-        </el-button>
-        <el-button type="primary">
+        <el-button type="primary" @click="showExportDialog = true; exportAll = false">
           统计报表
         </el-button>
         <el-button type="danger" :disabled="selectedRowIds.size === 0">
@@ -69,6 +66,7 @@
       </div>
 
       <el-table
+        ref="tableRef"
         v-loading="loading"
         :data="returnList"
         style="width: 100%"
@@ -236,6 +234,25 @@
             <el-button type="primary" @click="confirmCancel">确定</el-button>
           </template>
         </el-dialog>
+
+      <el-dialog
+        v-model="showExportDialog"
+        title="导出统计报表"
+        width="400px"
+        :close-on-click-modal="false"
+      >
+        <div style="text-align: center; padding: 20px 0;">
+          <p style="margin-bottom: 20px; color: #666;">确定要导出归还记录吗？</p>
+          <el-checkbox v-model="exportAll" style="margin-bottom: 20px;">导出全部记录</el-checkbox>
+          <br>
+          <el-button type="primary" size="large" @click="handleExport()">
+            确认导出Excel
+          </el-button>
+        </div>
+        <template #footer>
+          <el-button @click="showExportDialog = false">取消</el-button>
+        </template>
+      </el-dialog>
     </div>
   </div>
 </template>
@@ -265,6 +282,9 @@ const selectedRowIds = ref(new Set())
 
 const showViewDialog = ref(false)
 const viewForm = ref({})
+const showExportDialog = ref(false)
+const exportAll = ref(false)
+const tableRef = ref(null)
 
 const showCancelDialog = ref(false)
 const cancelForm = ref({
@@ -465,15 +485,84 @@ const handleSelectionChange = (selection) => {
 }
 
 const handleSelectAll = () => {
+  if (tableRef.value) {
+    tableRef.value.clearSelection()
+    selectedRowIds.value.clear()
+  }
   returnList.value.forEach(row => {
     selectedRowIds.value.add(row.id)
   })
+  if (tableRef.value) {
+    tableRef.value.toggleAllSelection()
+  }
   ElMessage.success(`已选择当前页 ${returnList.value.length} 条记录`)
 }
 
 const handleDeselectAll = () => {
+  if (tableRef.value) {
+    tableRef.value.clearSelection()
+  }
   selectedRowIds.value.clear()
   ElMessage.success('已取消所有选择')
+}
+
+const handleExport = async () => {
+  showExportDialog.value = false
+  try {
+    const params = new URLSearchParams()
+    if (searchStatus.value !== null && searchStatus.value !== '') {
+      params.append('status', searchStatus.value)
+    }
+    if (searchKeyword.value) {
+      params.append('keyword', searchKeyword.value)
+    }
+    if (exportAll.value) {
+      params.append('exportAll', 'true')
+    } else {
+      params.append('current', '1')
+      params.append('size', pageSize.value.toString())
+    }
+    
+    const token = localStorage.getItem('token')
+    const headers = {}
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`
+    }
+    const response = await fetch(`/api/lifecycle/return/export?${params.toString()}`, {
+      credentials: 'include',
+      headers
+    })
+    
+    if (!response.ok) {
+      if (response.status === 403) {
+        ElMessage.error('您没有权限执行此操作，请确保已登录')
+      } else {
+        ElMessage.error('导出失败，请稍后重试')
+      }
+      return
+    }
+    
+    const blob = await response.blob()
+    const downloadUrl = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = downloadUrl
+    const now = new Date()
+    const timestamp = now.getFullYear() + 
+      String(now.getMonth() + 1).padStart(2, '0') + 
+      String(now.getDate()).padStart(2, '0') + 
+      String(now.getHours()).padStart(2, '0') + 
+      String(now.getMinutes()).padStart(2, '0') + 
+      String(now.getSeconds()).padStart(2, '0')
+    a.download = `归还记录_${timestamp}.xlsx`
+    document.body.appendChild(a)
+    a.click()
+    window.URL.revokeObjectURL(downloadUrl)
+    document.body.removeChild(a)
+    ElMessage.success('导出成功')
+  } catch (error) {
+    console.error('Export error:', error)
+    ElMessage.error('导出失败，请稍后重试')
+  }
 }
 
 onMounted(() => {

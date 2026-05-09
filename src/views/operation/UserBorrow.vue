@@ -32,31 +32,6 @@
             <el-icon><Search /></el-icon>
           </template>
         </el-input>
-        <el-button
-          v-if="isAdmin && !showManagement"
-          type="primary"
-          @click="showManagement = true"
-          style="margin-left: auto;"
-        >
-          管理
-        </el-button>
-      </div>
-
-      <div v-if="showManagement && isAdmin" class="management-bar">
-        <el-button type="success">
-          导出Excel
-        </el-button>
-        <el-button type="primary">
-          统计报表
-        </el-button>
-        <el-button type="danger" :disabled="selectedRowIds.size === 0">
-          批量删除 ({{ selectedRowIds.size }})
-        </el-button>
-        <el-button type="info" @click="handleSelectAll">全选当前页</el-button>
-        <el-button type="info" @click="handleDeselectAll">取消全选</el-button>
-        <el-button type="info" @click="showManagement = false">
-          返回
-        </el-button>
       </div>
 
       <el-table
@@ -64,9 +39,7 @@
         :data="borrowList"
         style="width: 100%"
         border
-        @selection-change="handleSelectionChange"
       >
-        <el-table-column v-if="showManagement && isAdmin" type="selection" width="55" align="center" />
         <el-table-column type="index" label="序号" width="60" align="center" />
         <el-table-column label="设备图片" width="100" align="center">
           <template #default="{ row }">
@@ -318,15 +291,13 @@ const router = useRouter()
 const route = useRoute()
 
 const loading = ref(false)
+const submitting = ref(false)
 const borrowList = ref([])
 const currentPage = ref(1)
 const pageSize = ref(10)
 const total = ref(0)
 const searchStatus = ref(null)
 const searchKeyword = ref('')
-const isAdmin = ref(localStorage.getItem('isAdministrator') === 'true')
-const showManagement = ref(false)
-const selectedRowIds = ref(new Set())
 
 const showViewDialog = ref(false)
 const viewForm = ref({})
@@ -403,6 +374,7 @@ const handleReturn = (row) => {
 }
 
 const submitReturn = async () => {
+  if (submitting.value) return
   if (returnForm.value.returnQuantity < 1) {
     ElMessage.error('归还数量不能小于1')
     return
@@ -412,6 +384,7 @@ const submitReturn = async () => {
     return
   }
   
+  submitting.value = true
   try {
     const res = await service.put(`/lifecycle/borrow/${returnForm.value.id}/return`, {
       returnQuantity: returnForm.value.returnQuantity
@@ -427,6 +400,8 @@ const submitReturn = async () => {
   } catch (err) {
     console.error('归还失败:', err)
     ElMessage.error('归还申请提交失败')
+  } finally {
+    submitting.value = false
   }
 }
 
@@ -447,11 +422,13 @@ const handleRepair = (row) => {
 }
 
 const submitRepair = async () => {
+  if (submitting.value) return
   if (!repairFormRef.value) return
   
   await repairFormRef.value.validate(async (valid) => {
     if (!valid) return
     
+    submitting.value = true
     try {
       const res = await service.post('/lifecycle/repair', {
         equipmentId: repairForm.value.equipmentId,
@@ -472,6 +449,8 @@ const submitRepair = async () => {
     } catch (err) {
       console.error('报修失败:', err)
       ElMessage.error('报修申请提交失败')
+    } finally {
+      submitting.value = false
     }
   })
 }
@@ -560,22 +539,6 @@ const handleView = async (row) => {
     viewForm.value = { ...row }
     showViewDialog.value = true
   }
-}
-
-const handleSelectionChange = (selection) => {
-  selectedRowIds.value = new Set(selection.map(item => item.id))
-}
-
-const handleSelectAll = () => {
-  borrowList.value.forEach(row => {
-    selectedRowIds.value.add(row.id)
-  })
-  ElMessage.success(`已选择当前页 ${borrowList.value.length} 条记录`)
-}
-
-const handleDeselectAll = () => {
-  selectedRowIds.value.clear()
-  ElMessage.success('已取消所有选择')
 }
 
 const formatDate = (date) => {

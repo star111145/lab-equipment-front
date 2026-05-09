@@ -31,31 +31,6 @@
             <el-icon><Search /></el-icon>
           </template>
         </el-input>
-        <el-button
-          v-if="isAdmin && !showManagement"
-          type="primary"
-          @click="showManagement = true"
-          style="margin-left: auto;"
-        >
-          管理
-        </el-button>
-      </div>
-
-      <div v-if="showManagement && isAdmin" class="management-bar">
-        <el-button type="success">
-          导出Excel
-        </el-button>
-        <el-button type="primary">
-          统计报表
-        </el-button>
-        <el-button type="danger" :disabled="selectedRowIds.size === 0">
-          批量删除 ({{ selectedRowIds.size }})
-        </el-button>
-        <el-button type="info" @click="handleSelectAll">全选当前页</el-button>
-        <el-button type="info" @click="handleDeselectAll">取消全选</el-button>
-        <el-button type="info" @click="showManagement = false">
-          返回
-        </el-button>
       </div>
 
       <el-table
@@ -63,9 +38,7 @@
         :data="reserveList"
         style="width: 100%"
         border
-        @selection-change="handleSelectionChange"
       >
-        <el-table-column v-if="showManagement && isAdmin" type="selection" width="55" align="center" />
         <el-table-column type="index" label="序号" width="60" align="center" />
         <el-table-column label="设备图片" width="100" align="center">
           <template #default="{ row }">
@@ -216,13 +189,14 @@
               placeholder="选择预约时间"
               format="YYYY-MM-DD HH:mm:ss"
               value-format="YYYY-MM-DD HH:mm:ss"
+              :disabled-date="disabledDate"
             />
           </el-form-item>
           <el-form-item label="预约时长" required>
             <el-input-number
               v-model="editForm.reserveDuration"
               :min="1"
-              :max="24"
+              :max="720"
               controls-position="right"
             />
             <span style="margin-left: 10px">小时</span>
@@ -259,7 +233,7 @@
             <el-input-number
               v-model="extendForm.newReserveDuration"
               :min="1"
-              :max="24"
+              :max="720"
               controls-position="right"
             />
             <span style="margin-left: 10px">小时</span>
@@ -346,15 +320,13 @@ const route = useRoute()
 const defaultImage = require('@/assets/default_equipment.png')
 
 const loading = ref(false)
+const submitting = ref(false)
 const reserveList = ref([])
 const currentPage = ref(1)
 const pageSize = ref(10)
 const total = ref(0)
 const searchStatus = ref(null)
 const searchKeyword = ref('')
-const isAdmin = ref(localStorage.getItem('isAdministrator') === 'true')
-const showManagement = ref(false)
-const selectedRowIds = ref(new Set())
 
 const showViewDialog = ref(false)
 const viewForm = ref({})
@@ -400,6 +372,13 @@ const formatDate = (date) => {
     hour: '2-digit',
     minute: '2-digit'
   })
+}
+
+const disabledDate = (time) => {
+  const now = new Date()
+  const thirtyDaysLater = new Date()
+  thirtyDaysLater.setDate(thirtyDaysLater.getDate() + 30)
+  return time.getTime() < now.getTime() - 86400000 || time.getTime() > thirtyDaysLater.getTime()
 }
 
 const isReserveExpired = (row) => {
@@ -497,22 +476,6 @@ const getList = async () => {
   }
 }
 
-const handleSelectionChange = (selection) => {
-  selectedRowIds.value = new Set(selection.map(item => item.id))
-}
-
-const handleSelectAll = () => {
-  reserveList.value.forEach(row => {
-    selectedRowIds.value.add(row.id)
-  })
-  ElMessage.success(`已选择 ${selectedRowIds.value.size} 条记录`)
-}
-
-const handleDeselectAll = () => {
-  selectedRowIds.value.clear()
-  ElMessage.success('已取消选择')
-}
-
 const handleBorrow = async (row) => {
   const now = new Date()
   const reserveStartTime = new Date(row.reserveTime)
@@ -558,6 +521,7 @@ const handleBorrow = async (row) => {
 }
 
 const submitBorrow = async () => {
+  if (submitting.value) return
   if (!borrowForm.value.quantity || borrowForm.value.quantity < 1) {
     ElMessage.warning('请填写借用数量')
     return
@@ -584,6 +548,7 @@ const submitBorrow = async () => {
     return
   }
   
+  submitting.value = true
   try {
     const res = await service.post('/lifecycle/borrow', {
       equipmentId: borrowForm.value.id,
@@ -602,6 +567,8 @@ const submitBorrow = async () => {
   } catch (error) {
     console.error('借用提交错误：', error)
     ElMessage.error(error.response?.data?.msg || '提交失败，请重试')
+  } finally {
+    submitting.value = false
   }
 }
 
@@ -724,6 +691,7 @@ const handleExtend = (row) => {
 }
 
 const submitExtend = async () => {
+  if (submitting.value) return
   if (!extendForm.value.newReserveDuration || extendForm.value.newReserveDuration <= 0) {
     ElMessage.warning('请输入有效的延期时长')
     return
@@ -733,6 +701,7 @@ const submitExtend = async () => {
     return
   }
   
+  submitting.value = true
   try {
     const res = await service.post('/lifecycle/reserve/extend', {
       originalReservationId: extendForm.value.id,
@@ -749,6 +718,8 @@ const submitExtend = async () => {
   } catch (err) {
     console.error('延期申请提交失败:', err)
     ElMessage.error('延期申请提交失败')
+  } finally {
+    submitting.value = false
   }
 }
 

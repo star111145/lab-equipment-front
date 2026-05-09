@@ -28,6 +28,9 @@
       </div>
 
       <div v-if="showManagement" class="management-bar" style="margin-bottom: 20px;">
+        <el-button type="primary" @click="showExportDialog = true; exportAll = false">
+          统计报表
+        </el-button>
         <el-button type="danger" @click="handleBatchDelete" :disabled="selectedRowIds.size === 0">
           批量删除 ({{ selectedRowIds.size }})
         </el-button>
@@ -308,6 +311,25 @@
         <el-button type="primary" @click="handleResetPasswordSubmit">确定</el-button>
       </template>
     </el-dialog>
+
+    <el-dialog
+      v-model="showExportDialog"
+      title="导出统计报表"
+      width="400px"
+      :close-on-click-modal="false"
+    >
+      <div style="text-align: center; padding: 20px 0;">
+        <p style="margin-bottom: 20px; color: #666;">确定要导出用户记录吗？</p>
+        <el-checkbox v-model="exportAll" style="margin-bottom: 20px;">导出全部记录</el-checkbox>
+        <br>
+        <el-button type="primary" size="large" @click="handleExport">
+          确认导出Excel
+        </el-button>
+      </div>
+      <template #footer>
+        <el-button @click="showExportDialog = false">取消</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -331,6 +353,8 @@ export default {
     const avatarFileList = ref([])
     const defaultAvatar = require('@/assets/default_avatar.png')
     const userList = ref([])  // 显示的用户列表
+    const showExportDialog = ref(false)
+    const exportAll = ref(false)
 
     const editFormRef = ref(null)
     const resetFormRef = ref(null)
@@ -612,7 +636,63 @@ export default {
         .catch(() => {})
     }
 
-    // 处理删除全部用户
+    // 导出用户信息
+    const handleExport = async () => {
+      showExportDialog.value = false
+      try {
+        const params = new URLSearchParams()
+        if (searchText.value) {
+          params.append('keyword', searchText.value)
+        }
+        if (exportAll.value) {
+          params.append('exportAll', 'true')
+        } else {
+          params.append('current', '1')
+          params.append('size', pagination.size.toString())
+        }
+        
+        const token = localStorage.getItem('token')
+        const headers = {}
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`
+        }
+        const response = await fetch(`/api/user/export?${params.toString()}`, {
+          credentials: 'include',
+          headers
+        })
+        
+        if (!response.ok) {
+          if (response.status === 403) {
+            ElMessage.error('您没有权限执行此操作，请确保已登录')
+          } else {
+            ElMessage.error('导出失败，请稍后重试')
+          }
+          return
+        }
+        
+        const blob = await response.blob()
+        const downloadUrl = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = downloadUrl
+        const now = new Date()
+        const timestamp = now.getFullYear() + 
+          String(now.getMonth() + 1).padStart(2, '0') + 
+          String(now.getDate()).padStart(2, '0') + 
+          String(now.getHours()).padStart(2, '0') + 
+          String(now.getMinutes()).padStart(2, '0') + 
+          String(now.getSeconds()).padStart(2, '0')
+        a.download = `用户信息_${timestamp}.xlsx`
+        document.body.appendChild(a)
+        a.click()
+        window.URL.revokeObjectURL(downloadUrl)
+        document.body.removeChild(a)
+        ElMessage.success('导出成功')
+      } catch (error) {
+        console.error('Export error:', error)
+        ElMessage.error('导出失败，请稍后重试')
+      }
+    }
+
     const handleDeleteAll = async () => {
       ElMessageBox.confirm('确定要删除全部用户吗？此操作将保留至少一个管理员账户。', '警告', {
         type: 'warning',
@@ -729,6 +809,7 @@ export default {
       showEditDialog,
       showViewDialog,
       showResetDialog,
+      showExportDialog,
       showManagement,
       tableRef,
       selectedRowIds,
@@ -751,6 +832,7 @@ export default {
       handleDeselectAll,
       handleBatchDelete,
       handleDeleteAll,
+      handleExport,
       handleAvatarError,
       handleAvatarFileChange,
       clearAvatar,
@@ -807,9 +889,15 @@ export default {
 
 .management-bar {
   display: flex;
-  gap: 10px;
+  gap: 12px;
   align-items: center;
   flex-wrap: wrap;
+  padding: 15px;
+  margin-top: 15px;
+  margin-bottom: 20px;
+  background: var(--bg-color);
+  border-radius: 8px;
+  border: 1px solid var(--main-border);
 }
 
 @media (max-width: 768px) {

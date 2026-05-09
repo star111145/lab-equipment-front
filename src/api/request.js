@@ -70,3 +70,15 @@ export const getEquipmentTypes = () => {
 export const checkReservationConflict = (params) => {
   return service.get('/lifecycle/reserve/check-conflict', { params })
 }
+
+export const getSystemConfigs = () => {
+  return service.get('/system/config')
+}
+
+export const updateSystemConfig = (data) => {
+  return service.put('/system/config', data)
+}
+
+export const batchUpdateSystemConfigs = (data) => {
+  return service.put('/system/config/batch', data)
+}

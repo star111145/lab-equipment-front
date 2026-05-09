@@ -76,8 +76,8 @@
               placeholder="设备类型"
               style="width: 140px; margin-left: 20px;"
               @change="handleEquipmentTypeChange"
+              clearable
             >
-              <el-option label="全部" value="" />
               <el-option
                 v-for="item in equipmentTypeList"
                 :key="item"
@@ -135,15 +135,16 @@
           </p>
         </div>
         <ReservationCalendar
-          v-if="selectedEquipmentId"
-          :key="selectedEquipmentId"
+          v-if="selectedEquipmentId || selectedEquipmentType"
+          :key="selectedEquipmentId + '-' + selectedEquipmentType"
           :equipment-id="selectedEquipmentId"
+          :equipment-type-id="calendarEquipmentTypeId"
           :time-slot="timeSlot"
           :status-filter="statusFilter"
           @event-click="handleCalendarEventClick"
         />
         <div v-else style="text-align: center; padding: 50px; color: #909399;">
-          请先选择设备查看预约日历
+          请先选择设备或设备类型查看预约日历
         </div>
       </el-card>
 
@@ -208,6 +209,18 @@ export default {
       return ''
     })
     
+    const calendarEquipmentTypeId = computed(() => {
+      if (selectedEquipmentId.value) {
+        const equipment = equipmentList.value.find(e => e.id === selectedEquipmentId.value)
+        return equipment?.equipmentTypeId || null
+      }
+      if (selectedEquipmentType.value) {
+        const equipment = equipmentList.value.find(e => e.equipmentType === selectedEquipmentType.value)
+        return equipment?.equipmentTypeId || null
+      }
+      return null
+    })
+    
     const timeSlotOptions = [
       { label: '全天', value: 'all' },
       { label: '0-12时', value: 'morning' },
@@ -252,11 +265,20 @@ export default {
     }
     
     const handleEquipmentChange = (value) => {
+      if (value) {
+        const equipment = equipmentList.value.find(e => e.id === value)
+        if (equipment && equipment.equipmentType) {
+          selectedEquipmentType.value = equipment.equipmentType
+        }
+      }
       selectedEquipmentId.value = value
     }
     
-    const handleEquipmentTypeChange = () => {
-      filterEquipmentList()
+    const handleEquipmentTypeChange = (value) => {
+      if (value) {
+        selectedEquipmentId.value = null
+      }
+      selectedEquipmentType.value = value
     }
     
     const handleEquipmentSearchChange = () => {
@@ -441,6 +463,7 @@ export default {
       equipmentList,
       equipmentTypeList,
       selectedEquipmentType,
+      calendarEquipmentTypeId,
       equipmentSearchText,
       filteredEquipmentList,
       timeSlot,

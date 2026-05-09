@@ -48,6 +48,9 @@
             <el-option label="最近一月" value="month" />
             <el-option label="最近一学期" value="semester" />
           </el-select>
+          <el-button type="primary" style="margin-left: 10px;" @click="showExportDialog = true">
+            导出报表
+          </el-button>
         </div>
       </div>
     </template>
@@ -89,11 +92,37 @@
         <div ref="repairStatisticsChartRef" class="chart"></div>
       </div>
     </div>
+
+    <el-dialog
+      v-model="showExportDialog"
+      title="导出统计报表"
+      width="450px"
+      :close-on-click-modal="false"
+    >
+      <div style="padding: 10px 0;">
+        <p style="margin-bottom: 20px; color: #666;">选择要导出的报表类型：</p>
+        <el-radio-group v-model="exportReportType" style="display: flex; flex-direction: column; gap: 10px;">
+          <el-radio value="all">全部报表</el-radio>
+          <el-radio value="statistics">概览统计</el-radio>
+          <el-radio value="equipment_status">设备状态分布</el-radio>
+          <el-radio value="usage_trend">设备使用趋势</el-radio>
+          <el-radio value="reservation">预约记录</el-radio>
+          <el-radio value="borrow">借用记录</el-radio>
+          <el-radio value="return">归还记录</el-radio>
+          <el-radio value="repair">报修记录</el-radio>
+        </el-radio-group>
+      </div>
+      <template #footer>
+        <el-button @click="showExportDialog = false">取消</el-button>
+        <el-button type="primary" @click="handleExport">确认导出</el-button>
+      </template>
+    </el-dialog>
   </el-card>
 </template>
 
 <script>
 import { ref, onMounted, onUnmounted, nextTick } from 'vue'
+import { ElMessage } from 'element-plus'
 import { websocketClient } from '@/utils/websocket'
 import * as echarts from 'echarts'
 import { Box, Monitor, Calendar, Warning } from '@element-plus/icons-vue'
@@ -121,6 +150,9 @@ export default {
     const searchText = ref('')
     const selectedEquipmentId = ref('')
     const filteredEquipmentList = ref([])
+    
+    const showExportDialog = ref(false)
+    const exportReportType = ref('all')
     
     const equipmentStatusChartRef = ref(null)
     const usageTrendChartRef = ref(null)
@@ -398,6 +430,55 @@ export default {
       })
     }
 
+    const handleExport = async () => {
+      showExportDialog.value = false
+      try {
+        const params = new URLSearchParams()
+        params.append('reportType', exportReportType.value)
+        params.append('period', period.value)
+        
+        if (equipmentType.value) {
+          params.append('equipmentType', equipmentType.value)
+        }
+        if (selectedEquipmentId.value) {
+          params.append('equipmentId', selectedEquipmentId.value.toString())
+        }
+        if (props.userId) {
+          params.append('userId', props.userId.toString())
+        }
+        if (props.isAdmin) {
+          params.append('role', 'admin')
+        }
+        
+        const queryString = params.toString()
+        const url = `/api/dashboard/export?${queryString}`
+        
+        const token = localStorage.getItem('token')
+        const headers = {}
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`
+        }
+        
+        const response = await fetch(url, { headers })
+        if (!response.ok) {
+          throw new Error('导出失败')
+        }
+        
+        const blob = await response.blob()
+        const downloadUrl = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = downloadUrl
+        a.download = `数据统计报表_${new Date().getTime()}.xlsx`
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        window.URL.revokeObjectURL(downloadUrl)
+      } catch (error) {
+        console.error('导出失败:', error)
+        ElMessage.error('导出失败，请重试')
+      }
+    }
+
     const renderRepairStatisticsChart = (data) => {
       if (!repairStatisticsChartRef.value) return
       
@@ -512,6 +593,9 @@ export default {
       searchText,
       selectedEquipmentId,
       filteredEquipmentList,
+      showExportDialog,
+      exportReportType,
+      handleExport,
       equipmentStatusChartRef,
       usageTrendChartRef,
       repairStatisticsChartRef,

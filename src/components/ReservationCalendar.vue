@@ -21,7 +21,13 @@ export default {
   props: {
     equipmentId: {
       type: Number,
-      required: true
+      required: false,
+      default: null
+    },
+    equipmentTypeId: {
+      type: Number,
+      required: false,
+      default: null
     },
     timeSlot: {
       type: String,
@@ -75,7 +81,18 @@ export default {
     }
     
     watch(() => props.equipmentId, () => {
-      if (props.equipmentId) {
+      if (props.equipmentId || props.equipmentTypeId) {
+        const calendarApi = calendarRef.value?.getApi()
+        if (calendarApi) {
+          const start = calendarApi.view.activeStart
+          const end = calendarApi.view.activeEnd
+          fetchEvents(formatDateForApi(start), formatDateForApi(end))
+        }
+      }
+    })
+    
+    watch(() => props.equipmentTypeId, () => {
+      if (props.equipmentId || props.equipmentTypeId) {
         const calendarApi = calendarRef.value?.getApi()
         if (calendarApi) {
           const start = calendarApi.view.activeStart
@@ -102,7 +119,45 @@ export default {
     })
     
     const getEventTitle = (item) => {
-      return item.userName || '预约'
+      return `${item.equipmentNumber || ''} - ${item.userName || '预约'}`
+    }
+    
+    const formatTimeRange = (item) => {
+      try {
+        const start = item.reserveTime
+        const end = calculateEndTime(item.reserveTime, item.reserveDuration)
+        const formatDate = (d) => {
+          let date
+          if (typeof d === 'string') {
+            date = new Date(d.replace(' ', 'T'))
+          } else {
+            date = new Date(d)
+          }
+          return `${date.getMonth() + 1}-${date.getDate()} ${date.getHours()}:${String(date.getMinutes()).padStart(2, '0')}`
+        }
+        return `${formatDate(start)} - ${formatDate(end)}`
+      } catch (e) {
+        return ''
+      }
+    }
+    
+    const formatTimeOnly = (item) => {
+      try {
+        const start = item.reserveTime
+        const end = calculateEndTime(item.reserveTime, item.reserveDuration)
+        const formatTime = (d) => {
+          let date
+          if (typeof d === 'string') {
+            date = new Date(d.replace(' ', 'T'))
+          } else {
+            date = new Date(d)
+          }
+          return `${date.getHours()}:${String(date.getMinutes()).padStart(2, '0')}`
+        }
+        return `${formatTime(start)} - ${formatTime(end)}`
+      } catch (e) {
+        return ''
+      }
     }
 
     const getEventStatus = (item) => {
@@ -112,8 +167,12 @@ export default {
     }
 
     const calculateEndTime = (startTime, duration) => {
-      const dateStr = startTime.replace(' ', 'T')
-      const start = new Date(dateStr)
+      let start
+      if (typeof startTime === 'string') {
+        start = new Date(startTime.replace(' ', 'T'))
+      } else {
+        start = new Date(startTime)
+      }
       start.setHours(start.getHours() + duration)
       return start
     }
@@ -134,11 +193,17 @@ export default {
     const fetchEvents = async (start, end) => {
       loading.value = true
       try {
-        const res = await getCalendarReservations({
-          equipmentId: props.equipmentId,
+        const params = {
           start: start,
           end: end
-        })
+        }
+        if (props.equipmentId) {
+          params.equipmentId = props.equipmentId
+        } else if (props.equipmentTypeId) {
+          params.equipmentTypeId = props.equipmentTypeId
+        }
+        
+        const res = await getCalendarReservations(params)
 
         if (res.data && Array.isArray(res.data)) {
           const mappedEvents = res.data.map(item => {
@@ -158,7 +223,11 @@ export default {
                 userId: item.userId,
                 userName: item.userName,
                 purpose: item.purpose,
-                reserveDuration: item.reserveDuration
+                reserveDuration: item.reserveDuration,
+                equipmentNumber: item.equipmentNumber,
+                equipmentName: item.equipmentName,
+                timeRange: formatTimeRange(item),
+                timeOnly: formatTimeOnly(item)
               }
             }
           })
@@ -240,7 +309,16 @@ export default {
         events: events.value,
         select: handleDateSelect,
         eventClick: handleEventClick,
-        datesSet: handleDatesSet
+        datesSet: handleDatesSet,
+        eventDidMount: (info) => {
+          const props = info.event.extendedProps
+          info.el.title = `设备名称：${props.equipmentName || ''}
+设备编号：${props.equipmentNumber || ''}
+预约人：${props.userName || ''}
+预约时间：${props.timeOnly || ''}
+用途：${props.purpose || ''}
+状态：${props.eventStatus || ''}`
+        }
       }
     })
 
@@ -260,13 +338,13 @@ export default {
     }
   }
 }
-</script>
-
+  </script>
+  
 <style scoped>
-.reservation-calendar {
-  width: 100%;
-  padding: 10px;
-}
+
+.reservation-calendar :deep(.fc-event) {
+    cursor: pointer;
+  }
 
 .reservation-calendar :deep(.fc) {
   font-family: inherit;

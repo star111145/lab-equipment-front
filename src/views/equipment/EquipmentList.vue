@@ -43,8 +43,8 @@
       </div>
 
       <div v-if="showManagement && isAdmin" class="management-bar">
-        <el-button type="primary" @click="handleExport" :disabled="selectedRowIds.size === 0">
-          导出Excel
+        <el-button type="primary" @click="showExportDialog = true; exportAll = false">
+          统计报表
         </el-button>
         <el-button type="danger" @click="handleBatchDelete" :disabled="selectedRowIds.size === 0">
           批量删除 ({{ selectedRowIds.size }})
@@ -116,9 +116,11 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="二维码" width="100">
+        <el-table-column label="二维码" width="180">
           <template #default="{ row }">
-            <el-button type="primary" link @click="viewQRCode(row.id)">查看</el-button>
+            <el-button type="primary" link @click="viewQRCode(row.id, row.qrcodeUrl)">查看</el-button>
+            <el-button type="warning" link @click="regenerateQRCode(row.id)">重制</el-button>
+            <el-button type="success" link @click="testMobileScan(row.equipmentNumber)">测试</el-button>
           </template>
         </el-table-column>
         <el-table-column label="操作" width="300" fixed="right" align="center">
@@ -534,6 +536,47 @@
         <el-button type="primary" @click="handleRepairSubmit">确定</el-button>
       </template>
     </el-dialog>
+
+    <el-dialog
+      v-model="showQRCodeDialog"
+      title="设备二维码"
+      width="350px"
+      :close-on-click-modal="false"
+    >
+      <div style="text-align: center; padding: 20px 0;">
+        <img 
+          v-if="viewQRCodeUrl" 
+          :src="viewQRCodeUrl" 
+          alt="设备二维码" 
+          style="max-width: 280px; border: 1px solid #ddd; padding: 10px;"
+          @error="(e) => e.target.src = ''"
+        />
+        <p v-else style="color: #999;">加载中...</p>
+      </div>
+      <template #footer>
+        <el-button type="primary" @click="downloadQRCode">下载二维码</el-button>
+        <el-button @click="showQRCodeDialog = false">关闭</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog
+      v-model="showExportDialog"
+      title="导出统计报表"
+      width="400px"
+      :close-on-click-modal="false"
+    >
+      <div style="text-align: center; padding: 20px 0;">
+        <p style="margin-bottom: 20px; color: #666;">确定要导出设备记录吗？</p>
+        <el-checkbox v-model="exportAll" style="margin-bottom: 20px;">导出全部记录</el-checkbox>
+        <br>
+        <el-button type="primary" size="large" @click="handleExport">
+          确认导出Excel
+        </el-button>
+      </div>
+      <template #footer>
+        <el-button @click="showExportDialog = false">取消</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -545,6 +588,8 @@ import service from '@/api/request'
 import { websocketClient } from '@/utils/websocket'
 import { Search, UploadFilled, InfoFilled } from '@element-plus/icons-vue'
 import NumberInput from '@/components/NumberInput.vue'
+
+const QR_BASE_URL = 'http://10.29.80.192:8090'
 
 export default {
   name: 'EquipmentList',
@@ -561,6 +606,11 @@ export default {
     const showBorrowDialog = ref(false)
     const showReserveDialog = ref(false)
     const showRepairDialog = ref(false)
+    const showExportDialog = ref(false)
+    const showQRCodeDialog = ref(false)
+    const viewQRCodeUrl = ref('')
+    const currentQRCodeId = ref(null)
+    const exportAll = ref(false)
     const equipmentList = ref([])
     const editFormRef = ref(null)
     const repairFormRef = ref(null)
@@ -796,6 +846,20 @@ export default {
 
     const handleReserveSubmit = async () => {
       try {
+        const checkExistRes = await service.get('/lifecycle/reserve/user/list', {
+          params: { current: 1, size: 50, equipmentId: reserveForm.id, status: -1 }
+        })
+        if (checkExistRes.code === 200 && checkExistRes.data?.records) {
+          const existingReserve = checkExistRes.data.records.find(r => 
+            String(r.equipmentId) === String(reserveForm.id) && 
+            (r.reserveStatus === 0 || r.reserveStatus === 1)
+          )
+          if (existingReserve) {
+            ElMessage.warning('您已存在该设备的有效预约，请勿重复预约')
+            return
+          }
+        }
+        
         if (!reserveForm.reserveTime) {
           ElMessage.warning('请选择预约时间')
           return
@@ -959,20 +1023,63 @@ export default {
       }
     }
 
-    const viewQRCode = async (id) => {
+    const viewQRCode = async (id, qrcodeUrl) => {
       try {
-        const res = await service.get(`/equipment/${id}/qrcode`, { responseType: 'blob' })
-        const url = window.URL.createObjectURL(new Blob([res.data]))
-        const link = document.createElement('a')
-        link.href = url
-        link.setAttribute('download', `equipment_${id}_qrcode.png`)
-        document.body.appendChild(link)
-        link.click()
-        link.remove()
+        if (!qrcodeUrl) {
+          const res = await service.post(`/equipment/${id}/regenerate-qrcode`)
+          if (res.code === 200) {
+            qrcodeUrl = res.data
+            getEquipmentList()
+          }
+        }
+        if (!qrcodeUrl) {
+          const infoRes = await service.get(`/equipment/${id}`)
+          if (infoRes.code === 200 && infoRes.data.qrcodeUrl) {
+            qrcodeUrl = infoRes.data.qrcodeUrl
+          }
+        }
+        if (qrcodeUrl) {
+          viewQRCodeUrl.value = qrcodeUrl
+          currentQRCodeId.value = id
+          showQRCodeDialog.value = true
+        } else {
+          ElMessage.warning('无法获取二维码')
+        }
       } catch (err) {
         console.error('获取二维码失败:', err)
         ElMessage.error('获取二维码失败')
       }
+    }
+
+    const downloadQRCode = async () => {
+      if (!viewQRCodeUrl.value) return
+      const link = document.createElement('a')
+      link.href = viewQRCodeUrl.value
+      link.download = `equipment_${currentQRCodeId.value}_qrcode.png`
+      link.target = '_blank'
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+    }
+
+    const regenerateQRCode = async (id) => {
+      try {
+        const res = await service.post(`/equipment/${id}/regenerate-qrcode`)
+        if (res.code === 200) {
+          ElMessage.success('二维码重新生成成功')
+          getEquipmentList()
+        } else {
+          ElMessage.error(res.message || '生成失败')
+        }
+      } catch (err) {
+        console.error('重新生成二维码失败:', err)
+        ElMessage.error('重新生成二维码失败')
+      }
+    }
+
+    const testMobileScan = (equipmentNumber) => {
+      const url = `${QR_BASE_URL}/mobile/device?equipmentNumber=${equipmentNumber}`
+      window.open(url, '_blank')
     }
 
     const handleImageError = (row) => {
@@ -1081,14 +1188,67 @@ export default {
         .catch(() => {})
     }
 
-    const handleExport = () => {
-      if (selectedRowIds.value.size === 0) {
-        ElMessage.warning('请先选择要导出的设备')
-        return
+    const handleExport = async () => {
+      showExportDialog.value = false
+      try {
+        const token = localStorage.getItem('token')
+        const headers = {}
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`
+        }
+        
+        const params = new URLSearchParams()
+        if (searchText.value) {
+          params.append('keyword', searchText.value)
+        }
+        if (searchType.value) {
+          params.append('equipmentType', searchType.value)
+        }
+        if (exportAll.value) {
+          params.append('exportAll', 'true')
+        } else {
+          params.append('current', '1')
+          params.append('size', pagination.size.toString())
+        }
+        
+        const queryString = params.toString()
+        const url = `/api/equipment/export?${queryString}`
+        
+        const response = await fetch(url, {
+          credentials: 'include',
+          headers
+        })
+        
+        if (!response.ok) {
+          if (response.status === 403) {
+            ElMessage.error('您没有权限执行此操作，请确保已登录')
+          } else {
+            ElMessage.error('导出失败，请稍后重试')
+          }
+          return
+        }
+        
+        const blob = await response.blob()
+        const downloadUrl = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = downloadUrl
+        const now = new Date()
+        const timestamp = now.getFullYear() + 
+          String(now.getMonth() + 1).padStart(2, '0') + 
+          String(now.getDate()).padStart(2, '0') + 
+          String(now.getHours()).padStart(2, '0') + 
+          String(now.getMinutes()).padStart(2, '0') + 
+          String(now.getSeconds()).padStart(2, '0')
+        a.download = `设备信息_${timestamp}.xlsx`
+        document.body.appendChild(a)
+        a.click()
+        window.URL.revokeObjectURL(downloadUrl)
+        document.body.removeChild(a)
+        ElMessage.success('导出成功')
+      } catch (error) {
+        console.error('Export error:', error)
+        ElMessage.error('导出失败，请稍后重试')
       }
-      
-      const equipmentIds = Array.from(selectedRowIds.value)
-      window.location.href = `/api/equipment/export?equipmentIds=${equipmentIds.join(',')}`
     }
 
     const clearRepairImage = () => {
@@ -1221,6 +1381,10 @@ export default {
       showBorrowDialog,
       showReserveDialog,
       showRepairDialog,
+      showExportDialog,
+      showQRCodeDialog,
+      viewQRCodeUrl,
+      currentQRCodeId,
       equipmentList,
       editFormRef,
       repairFormRef,
@@ -1249,6 +1413,9 @@ export default {
       handleRepairSubmit,
       handleDelete,
       viewQRCode,
+      regenerateQRCode,
+      downloadQRCode,
+      testMobileScan,
       handleSelectionChange,
       handleSelectAll,
       handleDeselectAll,

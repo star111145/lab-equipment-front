@@ -193,6 +193,7 @@ const route = useRoute()
 const defaultImage = require('@/assets/default_equipment.png')
 
 const loading = ref(false)
+const submitting = ref(false)
 const returnList = ref([])
 const currentPage = ref(1)
 const pageSize = ref(10)

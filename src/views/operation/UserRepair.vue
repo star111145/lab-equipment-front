@@ -31,31 +31,6 @@
             <el-icon><Search /></el-icon>
           </template>
         </el-input>
-        <el-button
-          v-if="isAdmin && !showManagement"
-          type="primary"
-          @click="showManagement = true"
-          style="margin-left: auto;"
-        >
-          管理
-        </el-button>
-      </div>
-
-      <div v-if="showManagement && isAdmin" class="management-bar">
-        <el-button type="success">
-          导出Excel
-        </el-button>
-        <el-button type="primary">
-          统计报表
-        </el-button>
-        <el-button type="danger" :disabled="selectedRowIds.size === 0">
-          批量删除 ({{ selectedRowIds.size }})
-        </el-button>
-        <el-button type="info" @click="handleSelectAll">全选当前页</el-button>
-        <el-button type="info" @click="handleDeselectAll">取消全选</el-button>
-        <el-button type="info" @click="showManagement = false">
-          返回
-        </el-button>
       </div>
 
       <el-table
@@ -63,9 +38,7 @@
         :data="repairList"
         style="width: 100%"
         border
-        @selection-change="handleSelectionChange"
       >
-        <el-table-column v-if="showManagement && isAdmin" type="selection" width="55" align="center" />
         <el-table-column type="index" label="序号" width="60" align="center" />
         <el-table-column label="设备图片" width="100" align="center">
           <template #default="{ row }">
@@ -205,9 +178,6 @@ const pageSize = ref(10)
 const total = ref(0)
 const searchStatus = ref(null)
 const searchKeyword = ref('')
-const isAdmin = ref(localStorage.getItem('isAdministrator') === 'true')
-const showManagement = ref(false)
-const selectedRowIds = ref(new Set())
 
 const showViewDialog = ref(false)
 const viewForm = ref({})
@@ -283,22 +253,6 @@ const handleCancel = (row) => {
       ElMessage.error('取消失败')
     }
   }).catch(() => {})
-}
-
-const handleSelectionChange = (selection) => {
-  selectedRowIds.value = new Set(selection.map(item => item.id))
-}
-
-const handleSelectAll = () => {
-  repairList.value.forEach(row => {
-    selectedRowIds.value.add(row.id)
-  })
-  ElMessage.success(`已选择当前页 ${repairList.value.length} 条记录`)
-}
-
-const handleDeselectAll = () => {
-  selectedRowIds.value.clear()
-  ElMessage.success('已取消所有选择')
 }
 
 const formatDate = (date) => {

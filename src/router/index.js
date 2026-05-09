@@ -12,6 +12,10 @@ import UserBorrow from '@/views/operation/UserBorrow.vue'
 import UserReturn from '@/views/operation/UserReturn.vue'
 import UserRepair from '@/views/operation/UserRepair.vue'
 import UserReserve from '@/views/operation/UserReserve.vue'
+import MobileLogin from '@/views/mobile/MobileLogin.vue'
+import MobileDevice from '@/views/mobile/MobileDevice.vue'
+import MobileProfile from '@/views/mobile/MobileProfile.vue'
+import MobileRecords from '@/views/mobile/MobileRecords.vue'
 
 import ProfileInfo from '@/views/profile/ProfileInfo.vue'
 import UserList from '@/views/admin/user/UserList.vue'
@@ -25,6 +29,26 @@ import NotFound from '@/views/error/NotFound.vue'
 import { checkTokenExpire } from '@/utils/auth'
 
 const routes = [
+  {
+    path: '/mobile/device',
+    name: 'MobileDevice',
+    component: MobileDevice
+  },
+  {
+    path: '/mobile/login',
+    name: 'MobileLogin',
+    component: MobileLogin
+  },
+  {
+    path: '/mobile/profile',
+    name: 'MobileProfile',
+    component: MobileProfile
+  },
+  {
+    path: '/mobile/records',
+    name: 'MobileRecords',
+    component: MobileRecords
+  },
   {
     path: '/login',
     name: 'Login',
